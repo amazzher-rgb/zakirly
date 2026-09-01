@@ -21,47 +21,24 @@ import {
 } from './src/types';
 import { loadStateFromSql, saveStateToSql } from './src/db/storage';
 
-const DB_FILE_PATH = path.join(process.cwd(), 'db_persistent.json');
-
-function loadPersistentDb(): DatabaseState {
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const data = fs.readFileSync(DB_FILE_PATH, 'utf-8');
-      const parsed = JSON.parse(data);
-      if (parsed && Array.isArray(parsed.students) && Array.isArray(parsed.teachers)) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.error('Failed to load db_persistent.json, starting with initial state', e);
-  }
-  const initial = JSON.parse(JSON.stringify(initialDatabaseState));
-  (initial as any)._userModified = false;
-  (initial as any).dataVersion = 1;
-  (initial as any).lastSavedAt = '2020-01-01T00:00:00.000Z';
-  try {
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(initial, null, 2), 'utf-8');
-  } catch (e) {}
-  return initial;
-}
-
-// Persistent Database Store
-let db: DatabaseState = loadPersistentDb();
+// Initial in-memory state setup
+let db: DatabaseState = JSON.parse(JSON.stringify(initialDatabaseState));
 let serverVersion: number = Number((db as any)?.dataVersion) || 1;
 
-// Lazy sync from SQL on server boot
+// Sync from PostgreSQL Database on server boot
 (async () => {
   try {
     const sqlDb = await loadStateFromSql();
     if (sqlDb && Array.isArray(sqlDb.students) && Array.isArray(sqlDb.teachers)) {
       db = sqlDb;
-      console.log('Successfully synced database state from Cloud SQL.');
+      serverVersion = Number((sqlDb as any)?.dataVersion) || serverVersion;
+      console.log('Successfully synced database state from PostgreSQL.');
     } else {
-      // Seed initial state into SQL table
+      // Seed initial state into PostgreSQL table
       await saveStateToSql(db);
     }
   } catch (e) {
-    console.warn('Initial SQL sync deferred:', e);
+    console.warn('Initial PostgreSQL sync deferred:', e);
   }
 })();
 
@@ -71,11 +48,10 @@ function savePersistentDb(data: DatabaseState) {
     (data as any)._userModified = true;
     (data as any).dataVersion = serverVersion;
     (data as any).lastSavedAt = new Date().toISOString();
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), 'utf-8');
-    // Save to Cloud SQL asynchronously
-    saveStateToSql(data).catch((err) => console.warn('Background SQL save error:', err));
+    // Save to PostgreSQL via Drizzle ORM
+    saveStateToSql(data).catch((err) => console.warn('Background PostgreSQL save error:', err));
   } catch (e) {
-    console.error('Failed to save db_persistent.json', e);
+    console.error('Failed to save state to PostgreSQL', e);
   }
 }
 

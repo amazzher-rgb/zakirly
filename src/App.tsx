@@ -1,6 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import { testFirebaseConnection } from './lib/firebase';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -125,10 +124,6 @@ const MainContent: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { isAuthenticated } = useApp();
-
-  useEffect(() => {
-    testFirebaseConnection();
-  }, []);
 
   if (!isAuthenticated) {
     return <LoginPage />;
