@@ -1,0 +1,6 @@
+{
+  "name": "Zakirly Academy OS",
+  "description": "Comprehensive SaaS Academy ERP & Learning Management System with Realtime Synchronization, Automation Workflows, Arabic RTL, Roles & Payroll",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

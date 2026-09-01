@@ -1,0 +1,641 @@
+{
+  "tenants": [
+    {
+      "id": "tenant-zakirly-curriculum",
+      "nameAr": "أكاديمية ذاكر لي (المناهج)",
+      "nameEn": "Zakirly Academy (Curriculum)",
+      "code": "ZAKIRLY-CURRICULUM",
+      "logo": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=150&auto=format&fit=crop&q=80",
+      "currency": "SAR",
+      "phone": "+20 100 234 5678",
+      "email": "curriculum@zakirly.academy",
+      "status": "active"
+    },
+    {
+      "id": "tenant-zakirly-courses",
+      "nameAr": "أكاديمية ذاكر لي (الدورات)",
+      "nameEn": "Zakirly Academy (Courses)",
+      "code": "ZAKIRLY-COURSES",
+      "logo": "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=150&auto=format&fit=crop&q=80",
+      "currency": "SAR",
+      "phone": "+20 111 987 6543",
+      "email": "courses@zakirly.academy",
+      "status": "active"
+    }
+  ],
+  "users": [
+    {
+      "id": "usr-1786229956464",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "نور",
+      "nameAr": "سيد",
+      "email": "z@zakirly.com",
+      "password": "123456",
+      "role": "teacher",
+      "linkedEntityId": "tch-1786229956464",
+      "status": "active"
+    },
+    {
+      "id": "usr-1",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "د. أحمد محمود السعفي (مدير النظام)",
+      "nameAr": "د. أحمد محمود السعفي (مدير النظام)",
+      "email": "superadmin@zakirly.academy",
+      "password": "admin123",
+      "role": "super_admin",
+      "phone": "+201000000001",
+      "status": "active",
+      "lastLogin": "2026-08-04T15:30:00Z"
+    },
+    {
+      "id": "usr-admin-edu",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "مدير أكاديمية ذاكر لي",
+      "nameAr": "مدير أكاديمية ذاكر لي",
+      "email": "admin@zakirly.edu",
+      "password": "admin123",
+      "role": "super_admin",
+      "phone": "+201000000099",
+      "status": "active",
+      "lastLogin": "2026-08-04T15:30:00Z"
+    },
+    {
+      "id": "usr-2",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "أ. ياسر عبد العزيز (المدير الأكاديمي)",
+      "nameAr": "أ. ياسر عبد العزيز (المدير الأكاديمي)",
+      "email": "academic@zakirly.academy",
+      "password": "123456",
+      "role": "academic_director",
+      "phone": "+201000000002",
+      "status": "active",
+      "lastLogin": "2026-08-04T14:15:00Z"
+    },
+    {
+      "id": "usr-3",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "م. مريم فاروق (المدير الإداري)",
+      "nameAr": "م. مريم فاروق (المدير الإداري)",
+      "email": "admin@zakirly.academy",
+      "password": "123456",
+      "role": "administrative_director",
+      "phone": "+201000000003",
+      "status": "active",
+      "lastLogin": "2026-08-04T12:00:00Z"
+    },
+    {
+      "id": "usr-4",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "أ. خالد السيد (المشرف التعليمي)",
+      "nameAr": "أ. خالد السيد (المشرف التعليمي)",
+      "email": "supervisor@zakirly.academy",
+      "password": "supervisor123",
+      "role": "supervisor",
+      "phone": "+201000000004",
+      "status": "active",
+      "lastLogin": "2026-08-04T16:00:00Z"
+    },
+    {
+      "id": "usr-sup-edu",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "مشرف أكاديمية ذاكر لي",
+      "nameAr": "مشرف أكاديمية ذاكر لي",
+      "email": "supervisor@zakirly.edu",
+      "password": "supervisor123",
+      "role": "supervisor",
+      "phone": "+201000000098",
+      "status": "active",
+      "lastLogin": "2026-08-04T16:00:00Z"
+    },
+    {
+      "id": "usr-5",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "د. نورهان الشاذلي (المعلمة)",
+      "nameAr": "د. نورهان الشاذلي (المعلمة)",
+      "email": "teacher.nourhan@zakirly.academy",
+      "password": "123456",
+      "role": "teacher",
+      "linkedEntityId": "tch-3001",
+      "phone": "+201000000005",
+      "status": "active",
+      "lastLogin": "2026-08-04T11:45:00Z"
+    },
+    {
+      "id": "usr-6",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "المهندس عبد الرحمن علي (ولي الأمر)",
+      "nameAr": "المهندس عبد الرحمن علي (ولي الأمر)",
+      "email": "parent.abdelrahman@gmail.com",
+      "password": "123456",
+      "role": "parent",
+      "linkedEntityId": "par-2001",
+      "phone": "+201011223344",
+      "status": "active",
+      "lastLogin": "2026-08-04T10:20:00Z"
+    },
+    {
+      "id": "usr-7",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "عمر عبد الرحمن علي (الطالب)",
+      "nameAr": "عمر عبد الرحمن علي (الطالب)",
+      "email": "student.omar@zakirly.academy",
+      "password": "123456",
+      "role": "student",
+      "linkedEntityId": "stu-1001",
+      "phone": "+201011223345",
+      "status": "active",
+      "lastLogin": "2026-08-04T09:10:00Z"
+    },
+    {
+      "id": "usr-8",
+      "tenantId": "tenant-zakirly-curriculum",
+      "name": "أ. طارق عبد العليم (المحاسب)",
+      "nameAr": "أ. طارق عبد العليم (المحاسب)",
+      "email": "accountant@zakirly.academy",
+      "password": "123456",
+      "role": "accountant",
+      "phone": "+201000000008",
+      "status": "active",
+      "lastLogin": "2026-08-04T15:00:00Z"
+    }
+  ],
+  "parents": [
+    {
+      "id": "par-1786229736028",
+      "tenantId": "tenant-zakirly-curriculum",
+      "code": "PAR-9896",
+      "nameAr": "سيد",
+      "nameEn": "سيد",
+      "phone": "010145247",
+      "whatsapp": "010145247",
+      "email": "parent.1786229736028@zakirly.com",
+      "relationship": "والد / ولي أمر",
+      "childrenIds": [
+        "stu-1786229736028"
+      ],
+      "totalDue": 0,
+      "createdAt": "2026-08-08"
+    }
+  ],
+  "teachers": [
+    {
+      "id": "tch-1786229956464",
+      "tenantId": "tenant-zakirly-curriculum",
+      "code": "TCH-9874",
+      "nameAr": "سيد",
+      "nameEn": "نور",
+      "email": "z@zakirly.com",
+      "phone": "012524545",
+      "subjects": [
+        "اللغة الإنجليزية IGCSE"
+      ],
+      "languages": [
+        "العربية"
+      ],
+      "hourlyRate": 150,
+      "perSessionRate": 150,
+      "status": "active",
+      "totalEarned": 0,
+      "completedSessionsCount": 0,
+      "rating": 5,
+      "bio": "",
+      "joinedDate": "2026-08-08"
+    },
+    {
+      "id": "tch-3001",
+      "tenantId": "tenant-zakirly-curriculum",
+      "code": "TCH-3001",
+      "nameAr": "د. نورهان الشاذلي",
+      "nameEn": "Dr. Nourhan El-Shazly",
+      "email": "teacher.nourhan@zakirly.academy",
+      "phone": "+201001112233",
+      "subjects": [
+        "اللغة الإنجليزية (English IGCSE)",
+        "IELTS Preparation"
+      ],
+      "languages": [
+        "العربية",
+        "English"
+      ],
+      "hourlyRate": 250,
+      "perSessionRate": 250,
+      "status": "active",
+      "totalEarned": 0,
+      "completedSessionsCount": 0,
+      "rating": 4.9,
+      "bio": "دكتوراة في الأساليب الحديثة لتدريس الإنجليزية - خبرة 8 سنوات مع IGCSE",
+      "joinedDate": "2025-09-01"
+    },
+    {
+      "id": "tch-3002",
+      "tenantId": "tenant-zakirly-curriculum",
+      "code": "TCH-3002",
+      "nameAr": "الشيخ محمد نور الدين",
+      "nameEn": "Sheikh Mohamed Nour El-Din",
+      "email": "sheikh.mohamed@zakirly.academy",
+      "phone": "+201112223344",
+      "subjects": [
+        "القرآن الكريم والتجويد",
+        "اللغة العربية والقواعد"
+      ],
+      "languages": [
+        "العربية"
+      ],
+      "hourlyRate": 180,
+      "perSessionRate": 180,
+      "status": "active",
+      "totalEarned": 0,
+      "completedSessionsCount": 0,
+      "rating": 5,
+      "bio": "مجاز بالقراءات العشر من الأزهر الشريف - معتمد لتحفيظ الكبار والصغار",
+      "joinedDate": "2025-08-15"
+    },
+    {
+      "id": "tch-3003",
+      "tenantId": "tenant-zakirly-curriculum",
+      "code": "TCH-3003",
+      "nameAr": "م. هشام عبد المنعم",
+      "nameEn": "Eng. Hisham Abdel-Moneim",
+      "email": "hisham.math@zakirly.academy",
+      "phone": "+201223334455",
+      "subjects": [
+        "الرياضيات المتقدمة",
+        "الفيزياء الثانوية"
+      ],
+      "languages": [
+        "العربية",
+        "English"
+      ],
+      "hourlyRate": 220,
+      "perSessionRate": 220,
+      "status": "active",
+      "totalEarned": 0,
+      "completedSessionsCount": 0,
+      "rating": 4.8,
+      "bio": "مهندس اتصالات ومحاضر رياضيات خبرة 6 سنوات في الثانوية والدبلومة الأمريكية",
+      "joinedDate": "2025-10-10"
+    },
+    {
+      "id": "tch-3004",
+      "tenantId": "tenant-zakirly-courses",
+      "code": "TCH-3004",
+      "nameAr": "أ. سارة أندريه (Sarah Andre)",
+      "nameEn": "Sarah Andre",
+      "email": "sarah.french@zakirly.academy",
+      "phone": "+201099112233",
+      "subjects": [
+        "دبلومة اللغة الفرنسية (French DELF)",
+        "المحادثة الفرنسية"
+      ],
+      "languages": [
+        "French",
+        "English",
+        "Arabic"
+      ],
+      "hourlyRate": 280,
+      "perSessionRate": 280,
+      "status": "active",
+      "totalEarned": 0,
+      "completedSessionsCount": 0,
+      "rating": 4.9,
+      "bio": "Native French Teacher certified for DELF A1-B2 preparation",
+      "joinedDate": "2026-01-05"
+    },
+    {
+      "id": "tch-3005",
+      "tenantId": "tenant-zakirly-courses",
+      "code": "TCH-3005",
+      "nameAr": "أ. توماس مولر (Thomas Müller)",
+      "nameEn": "Thomas Müller",
+      "email": "thomas.german@zakirly.academy",
+      "phone": "+201554433221",
+      "subjects": [
+        "دورة اللغة الألمانيّة (German Goethe)",
+        "المحادثة الألمانية"
+      ],
+      "languages": [
+        "German",
+        "English"
+      ],
+      "hourlyRate": 300,
+      "perSessionRate": 300,
+      "status": "active",
+      "totalEarned": 0,
+      "completedSessionsCount": 0,
+      "rating": 4.7,
+      "bio": "Goethe Institute Certified Educator for levels A1 through C1",
+      "joinedDate": "2026-02-01"
+    }
+  ],
+  "students": [
+    {
+      "id": "stu-1786229736028",
+      "tenantId": "tenant-zakirly-curriculum",
+      "code": "STU-3540",
+      "nameAr": "نور",
+      "nameEn": "نور",
+      "gender": "male",
+      "email": "student.1786229736028@zakirly.com",
+      "phone": "010145247",
+      "parentId": "par-1786229736028",
+      "parentNameAr": "سيد",
+      "grade": "الصف الأول الثانوي",
+      "status": "active",
+      "balance": 0,
+      "currency": "SAR",
+      "remainingSessions": 4,
+      "totalSessionsCompleted": 8,
+      "enrolledCourseIds": [
+        "cs-101"
+      ],
+      "assignedTeacherId": "tch-3001",
+      "assignedTeacherNameAr": "د. نورهان الشاذلي",
+      "enrolledTeachers": [
+        {
+          "teacherId": "tch-3001",
+          "teacherNameAr": "د. نورهان الشاذلي"
+        }
+      ],
+      "packageNameAr": "اللغة الإنجليزية IGCSE / IELTS",
+      "notes": "تم تسجيل الطالب وربطه بولي الأمر والمعلم والمواد الجارية",
+      "createdAt": "2026-08-08",
+      "packageId": "sub-1786229736028"
+    }
+  ],
+  "courseSubjects": [
+    {
+      "id": "cs-101",
+      "tenantId": "tenant-zakirly-curriculum",
+      "code": "ENG-101",
+      "titleAr": "اللغة الإنجليزية IGCSE / IELTS",
+      "titleEn": "English IGCSE & IELTS Prep",
+      "category": "language",
+      "level": "Advanced B2-C1",
+      "pricePerSession": 250,
+      "suggestedDurationMinutes": 60,
+      "status": "active",
+      "descriptionAr": "منهج متكامل لمهارات الاستماع، القراءة، الكتابة، والمحادثة مع اختبارات تجريبية."
+    },
+    {
+      "id": "cs-102",
+      "tenantId": "tenant-zakirly-curriculum",
+      "code": "QUR-101",
+      "titleAr": "القرآن الكريم والتجويد الأحكام العملية",
+      "titleEn": "Holy Quran & Tajweed Rules",
+      "category": "quran",
+      "level": "جميع المستويات",
+      "pricePerSession": 180,
+      "suggestedDurationMinutes": 45,
+      "status": "active",
+      "descriptionAr": "تحفيظ وتصحيح التلاوة مع دراسة أحكام النون الساكنة والميم والتجويد."
+    },
+    {
+      "id": "cs-103",
+      "tenantId": "tenant-zakirly-curriculum",
+      "code": "MTH-201",
+      "titleAr": "الرياضيات المتقدمة والفيزياء",
+      "titleEn": "Advanced Mathematics & Physics",
+      "category": "academic",
+      "level": "المرحلة الثانوية والجامعية",
+      "pricePerSession": 220,
+      "suggestedDurationMinutes": 60,
+      "status": "active",
+      "descriptionAr": "شرح الميكانيكا والجبر والتفاضل والفيزياء مع تطبيق عملي وحل أسئلة الامتحانات."
+    },
+    {
+      "id": "cs-104",
+      "tenantId": "tenant-zakirly-courses",
+      "code": "FRN-101",
+      "titleAr": "دبلومة اللغة الفرنسية DELF A1 / A2",
+      "titleEn": "French Language DELF Prep",
+      "category": "language",
+      "level": "A1 - A2",
+      "pricePerSession": 280,
+      "suggestedDurationMinutes": 60,
+      "status": "active",
+      "descriptionAr": "تعلم الفرنسية مع معلمة معتمدة للشهادات الدولية الدلف."
+    },
+    {
+      "id": "cs-105",
+      "tenantId": "tenant-zakirly-courses",
+      "code": "GER-101",
+      "titleAr": "دورة اللغة الألمانية Goethe Zertifikat",
+      "titleEn": "German Language Goethe A1",
+      "category": "language",
+      "level": "A1 - B1",
+      "pricePerSession": 300,
+      "suggestedDurationMinutes": 60,
+      "status": "active",
+      "descriptionAr": "كورس لغة ألمانية معتمد لاجتياز اختبارات معهد غوته لسفر أو دراسة."
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "sub-1786229736028",
+      "tenantId": "tenant-zakirly-curriculum",
+      "studentId": "stu-1786229736028",
+      "studentNameAr": "نور",
+      "courseId": "cs-101",
+      "courseTitleAr": "اللغة الإنجليزية IGCSE / IELTS",
+      "totalSessions": 12,
+      "remainingSessions": 4,
+      "price": 3000,
+      "paidAmount": 3000,
+      "startDate": "2026-08-08",
+      "endDate": "2026-11-06",
+      "status": "active",
+      "autoRenewal": true,
+      "notes": "تم إصدار الاشتراك وتفعيل التسجيل آلياً"
+    }
+  ],
+  "sessions": [],
+  "attendance": [
+    {
+      "id": "att-1786230138413",
+      "tenantId": "tenant-zakirly-curriculum",
+      "sessionId": "sess-1786230138413",
+      "studentId": "stu-1786229736028",
+      "studentNameAr": "نور",
+      "teacherId": "tch-1786229956464",
+      "teacherNameAr": "سيد",
+      "date": "2026-09-05",
+      "status": "present",
+      "notes": "تم الحضور بانتظام والالتزام بالواجب",
+      "loggedBy": "المشرف الأكاديمي",
+      "timestamp": "2026-08-08T23:02:18.413Z"
+    },
+    {
+      "id": "att-1786230134821",
+      "tenantId": "tenant-zakirly-curriculum",
+      "sessionId": "sess-1786230134821",
+      "studentId": "stu-1786229736028",
+      "studentNameAr": "نور",
+      "teacherId": "tch-1786229956464",
+      "teacherNameAr": "سيد",
+      "date": "2026-09-03",
+      "status": "present",
+      "notes": "تم الحضور بانتظام والالتزام بالواجب",
+      "loggedBy": "المشرف الأكاديمي",
+      "timestamp": "2026-08-08T23:02:14.821Z"
+    },
+    {
+      "id": "att-1786230006078",
+      "tenantId": "tenant-zakirly-curriculum",
+      "sessionId": "sess-1786230006078",
+      "studentId": "stu-1786229736028",
+      "studentNameAr": "نور",
+      "teacherId": "tch-1786229956464",
+      "teacherNameAr": "سيد",
+      "date": "2026-08-27",
+      "status": "present",
+      "notes": "تم الحضور بانتظام والالتزام بالواجب",
+      "loggedBy": "المشرف الأكاديمي",
+      "timestamp": "2026-08-08T23:00:06.078Z"
+    },
+    {
+      "id": "att-1786230001678",
+      "tenantId": "tenant-zakirly-curriculum",
+      "sessionId": "sess-1786230001678",
+      "studentId": "stu-1786229736028",
+      "studentNameAr": "نور",
+      "teacherId": "tch-1786229956464",
+      "teacherNameAr": "سيد",
+      "date": "2026-08-29",
+      "status": "present",
+      "notes": "تم الحضور بانتظام والالتزام بالواجب",
+      "loggedBy": "المشرف الأكاديمي",
+      "timestamp": "2026-08-08T23:00:01.678Z"
+    },
+    {
+      "id": "att-1786229998119",
+      "tenantId": "tenant-zakirly-curriculum",
+      "sessionId": "sess-1786229998119",
+      "studentId": "stu-1786229736028",
+      "studentNameAr": "نور",
+      "teacherId": "tch-1786229956464",
+      "teacherNameAr": "سيد",
+      "date": "2026-08-26",
+      "status": "present",
+      "notes": "تم الحضور بانتظام والالتزام بالواجب",
+      "loggedBy": "المشرف الأكاديمي",
+      "timestamp": "2026-08-08T22:59:58.119Z"
+    }
+  ],
+  "invoices": [],
+  "payrolls": [],
+  "trialLessons": [
+    {
+      "id": "trl-6001",
+      "tenantId": "tenant-zakirly-courses",
+      "studentNameAr": "حمزة أحمد جاد",
+      "parentNameAr": "أ. فاطمة الزهراء جاد",
+      "parentPhone": "+201233445568",
+      "courseId": "cs-105",
+      "courseTitleAr": "دورة اللغة الألمانية Goethe Zertifikat",
+      "assignedTeacherId": "tch-3005",
+      "assignedTeacherNameAr": "أ. توماس مولر",
+      "scheduledDate": "2026-08-05",
+      "scheduledTime": "16:00",
+      "status": "scheduled",
+      "createdAt": "2026-08-01"
+    },
+    {
+      "id": "trl-6002",
+      "tenantId": "tenant-zakirly-curriculum",
+      "studentNameAr": "سيف الدين وائل",
+      "parentNameAr": "د. وائل الشريف",
+      "parentPhone": "+201088776655",
+      "courseId": "cs-101",
+      "courseTitleAr": "اللغة الإنجليزية IGCSE / IELTS",
+      "assignedTeacherId": "tch-3001",
+      "assignedTeacherNameAr": "د. نورهان الشاذلي",
+      "scheduledDate": "2026-08-02",
+      "scheduledTime": "15:00",
+      "status": "completed",
+      "conversionFeedback": "حصة ممتازة جداً، ولي الأمر ينوي الاشتراك بالباقة الشاملة",
+      "createdAt": "2026-07-28"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "ntf-1",
+      "tenantId": "tenant-zakirly-curriculum",
+      "targetRole": "all",
+      "titleAr": "تنبيه تجديد باقة الطالب عمر عبد الرحمن",
+      "titleEn": "Package Renewal Alert: Omar Ali",
+      "messageAr": "متبقي حصتان فقط في باقة اللغة الإنجليزية للطالب عمر عبد الرحمن علي.",
+      "messageEn": "Only 2 sessions remaining for student Omar Abdelrahman Ali in English Course.",
+      "type": "warning",
+      "read": false,
+      "createdAt": "2026-08-04T12:00:00Z",
+      "linkModule": "subscriptions"
+    },
+    {
+      "id": "ntf-2",
+      "tenantId": "tenant-zakirly-curriculum",
+      "targetRole": "accountant",
+      "titleAr": "استلام دفعة مالية بقيمة 3550 ج.م",
+      "titleEn": "Payment Received 3,550 EGP",
+      "messageAr": "تم تسجيل دفعة مالية للطالب عمر علي بنجاح رقم الفاتورة INV-2026-101.",
+      "messageEn": "Payment recorded for student Omar Ali Invoice #INV-2026-101.",
+      "type": "success",
+      "read": false,
+      "createdAt": "2026-08-01T10:30:00Z",
+      "linkModule": "finance"
+    },
+    {
+      "id": "ntf-3",
+      "tenantId": "tenant-zakirly-courses",
+      "targetRole": "supervisor",
+      "titleAr": "حصة تجريبية مجدولة لغداً",
+      "titleEn": "Trial Lesson Scheduled for Tomorrow",
+      "messageAr": "حصة تجريبية للطالب حمزة أحمد جاد في مادة اللغة الألمانية غداً الساعة 4:00 مساءً.",
+      "messageEn": "Trial lesson scheduled for Hamza Gad in German language tomorrow at 4:00 PM.",
+      "type": "info",
+      "read": true,
+      "createdAt": "2026-08-04T08:00:00Z",
+      "linkModule": "trial_lessons"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "log-101",
+      "tenantId": "tenant-zakirly-curriculum",
+      "userName": "د. نورهان الشاذلي",
+      "userRole": "teacher",
+      "actionAr": "إكمال حصة تعليمية وتسجيل الحضور",
+      "actionEn": "Completed Session & Recorded Attendance",
+      "module": "sessions",
+      "details": "تم خصم حصة من رصيد الطالب عمر عبد الرحمن وإضافة المستحق للمعلمة بنجاح.",
+      "timestamp": "2026-08-03T18:05:00Z",
+      "ip": "197.38.12.90"
+    },
+    {
+      "id": "log-102",
+      "tenantId": "tenant-zakirly-curriculum",
+      "userName": "أ. طارق عبد العليم",
+      "userRole": "accountant",
+      "actionAr": "إصدار سند قبض وتسجيل قسط مالي",
+      "actionEn": "Issued Receipt & Recorded Payment",
+      "module": "finance",
+      "details": "سداد بمبلغ 3,550 ج.م لحساب ولي الأمر مهندس عبد الرحمن علي.",
+      "timestamp": "2026-08-01T10:30:00Z",
+      "ip": "197.38.15.11"
+    },
+    {
+      "id": "log-103",
+      "tenantId": "tenant-zakirly-curriculum",
+      "userName": "د. أحمد محمود السعفي",
+      "userRole": "super_admin",
+      "actionAr": "تسجيل دخول للنظام وتمكين التحديث اللحظي",
+      "actionEn": "Logged in & Initialized Realtime State",
+      "module": "system",
+      "details": "تم بدء جلسة التحكم بالنظام بنجاح مع ربط جميع الشاشات المتصلة.",
+      "timestamp": "2026-08-04T15:30:00Z",
+      "ip": "197.38.10.01"
+    }
+  ],
+  "_userModified": true,
+  "dataVersion": 35,
+  "lastSavedAt": "2026-09-01T13:47:03.679Z"
+}
