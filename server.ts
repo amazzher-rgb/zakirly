@@ -19,6 +19,7 @@ import {
   Teacher,
   Parent,
 } from './src/types';
+import { loadStateFromSql, saveStateToSql } from './src/db/storage';
 
 const DB_FILE_PATH = path.join(process.cwd(), 'db_persistent.json');
 
@@ -48,6 +49,22 @@ function loadPersistentDb(): DatabaseState {
 let db: DatabaseState = loadPersistentDb();
 let serverVersion: number = Number((db as any)?.dataVersion) || 1;
 
+// Lazy sync from SQL on server boot
+(async () => {
+  try {
+    const sqlDb = await loadStateFromSql();
+    if (sqlDb && Array.isArray(sqlDb.students) && Array.isArray(sqlDb.teachers)) {
+      db = sqlDb;
+      console.log('Successfully synced database state from Cloud SQL.');
+    } else {
+      // Seed initial state into SQL table
+      await saveStateToSql(db);
+    }
+  } catch (e) {
+    console.warn('Initial SQL sync deferred:', e);
+  }
+})();
+
 function savePersistentDb(data: DatabaseState) {
   try {
     serverVersion++;
@@ -55,6 +72,8 @@ function savePersistentDb(data: DatabaseState) {
     (data as any).dataVersion = serverVersion;
     (data as any).lastSavedAt = new Date().toISOString();
     fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    // Save to Cloud SQL asynchronously
+    saveStateToSql(data).catch((err) => console.warn('Background SQL save error:', err));
   } catch (e) {
     console.error('Failed to save db_persistent.json', e);
   }
@@ -177,6 +196,26 @@ async function startServer() {
       version: serverVersion,
       lastSavedAt: (db as any)?.lastSavedAt || new Date().toISOString(),
     });
+  });
+
+  // SQL Database Connectivity Status
+  app.get('/api/sql/status', async (req: Request, res: Response) => {
+    try {
+      const isHealthy = await saveStateToSql(db);
+      res.json({
+        success: true,
+        database: 'Cloud SQL (PostgreSQL)',
+        status: isHealthy ? 'connected' : 'local_fallback',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e: any) {
+      res.json({
+        success: false,
+        database: 'Cloud SQL (PostgreSQL)',
+        status: 'error',
+        message: 'SQL check handled safely',
+      });
+    }
   });
 
   // Sync state from client
