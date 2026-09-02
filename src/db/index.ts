@@ -6,6 +6,9 @@ declare global {
   var _postgresPool: Pool | undefined;
 }
 
+export const DEFAULT_NEON_URL =
+  'postgresql://neondb_owner:npg_pRLUnPEiv96b@ep-late-rice-ayyenzvz-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require';
+
 export const createPool = (customUrl?: string) => {
   if (customUrl) {
     if (global._postgresPool) {
@@ -27,27 +30,17 @@ export const createPool = (customUrl?: string) => {
   }
 
   if (!global._postgresPool) {
-    const databaseUrl = process.env.DATABASE_URL;
+    const databaseUrl = process.env.DATABASE_URL || DEFAULT_NEON_URL;
 
-    const config = databaseUrl
-      ? {
-          connectionString: databaseUrl,
-          max: 20, // robust pool size for persistent production servers
-          idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 15000,
-          ssl: databaseUrl.includes('sslmode=require') || databaseUrl.includes('ssl=true') || databaseUrl.includes('neon.tech')
-            ? { rejectUnauthorized: false }
-            : undefined,
-        }
-      : {
-          host: process.env.SQL_HOST || '127.0.0.1',
-          user: process.env.SQL_USER || process.env.SQL_ADMIN_USER || 'postgres',
-          password: process.env.SQL_PASSWORD || process.env.SQL_ADMIN_PASSWORD || '',
-          database: process.env.SQL_DB_NAME || 'postgres',
-          max: 20,
-          idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 15000,
-        };
+    const config = {
+      connectionString: databaseUrl,
+      max: 20, // robust pool size for persistent production servers
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 15000,
+      ssl: databaseUrl.includes('sslmode=require') || databaseUrl.includes('ssl=true') || databaseUrl.includes('neon.tech')
+        ? { rejectUnauthorized: false }
+        : undefined,
+    };
 
     global._postgresPool = new Pool(config);
 

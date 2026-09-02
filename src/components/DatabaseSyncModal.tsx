@@ -18,6 +18,12 @@ import {
   Check,
 } from 'lucide-react';
 import { getApiBaseUrl, setCustomBackendUrl, CLOUD_BACKEND_URL } from '../services/api';
+import {
+  getActiveNeonConnectionString,
+  setActiveNeonConnectionString,
+  NEON_CONNECTION_STRING,
+  testDirectNeonConnection,
+} from '../services/neonDirect';
 
 interface DatabaseSyncModalProps {
   isOpen: boolean;
@@ -36,7 +42,9 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({ isOpen, on
     isRealtimeConnected,
   } = useApp();
 
-  const [neonConnectionString, setNeonConnectionString] = useState('');
+  const [neonConnectionString, setNeonConnectionString] = useState(
+    getActiveNeonConnectionString() || NEON_CONNECTION_STRING
+  );
   const [isTestingNeon, setIsTestingNeon] = useState(false);
   const [isConnectingNeon, setIsConnectingNeon] = useState(false);
   const [testResult, setTestResult] = useState<{
@@ -56,6 +64,7 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({ isOpen, on
   useEffect(() => {
     if (isOpen) {
       refreshCloudDbStatus();
+      setNeonConnectionString(getActiveNeonConnectionString() || NEON_CONNECTION_STRING);
       setBackendUrlInput(getApiBaseUrl() || CLOUD_BACKEND_URL);
     }
   }, [isOpen]);

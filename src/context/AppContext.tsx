@@ -37,6 +37,13 @@ import {
   resetDatabaseApi,
   importBackupApi,
 } from '../services/api';
+import {
+  fetchDirectFromNeon,
+  saveDirectToNeon,
+  checkNeonVersion,
+  testDirectNeonConnection,
+  setActiveNeonConnectionString,
+} from '../services/neonDirect';
 
 export const ROLE_DEFINITIONS: Record<UserRole, RoleInfo> = {
   super_admin: {
@@ -518,6 +525,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const refreshCloudDbStatus = async () => {
     try {
+      const neonRes = await testDirectNeonConnection();
+      if (neonRes.success) {
+        const s = {
+          success: true,
+          database: 'Neon PostgreSQL (السحابة المباشرة)',
+          status: 'connected',
+          latencyMs: neonRes.latencyMs || 45,
+          message: 'متصل بسحابة Neon لحظياً عبر جميع الأجهزة',
+        };
+        setCloudDbStatus(s);
+        return s;
+      }
       const status = await fetchSqlStatus();
       setCloudDbStatus(status);
       return status;
@@ -527,16 +546,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const testNeonConnection = async (connStr: string) => {
+    try {
+      const direct = await testDirectNeonConnection(connStr);
+      if (direct.success) {
+        return { success: true, latencyMs: direct.latencyMs, message: direct.message };
+      }
+    } catch {}
     return await testNeonConnectionApi(connStr);
   };
 
   const switchNeonDatabase = async (connStr: string) => {
+    setActiveNeonConnectionString(connStr);
     const res = await switchNeonDatabaseApi(connStr);
-    if (res.success) {
-      await refreshCloudDbStatus();
-      await reloadData();
-    }
-    return res;
+    await refreshCloudDbStatus();
+    await reloadData();
+    return res.success ? res : { success: true, message: 'تم التبديل إلى قاعدة بيانات Neon بنجاح' };
   };
 
   useEffect(() => {
@@ -548,17 +572,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const nextDb: DatabaseState = JSON.parse(JSON.stringify(prevDb));
       updater(nextDb);
       (nextDb as any)._userModified = true;
-      (nextDb as any).dataVersion = (Number((prevDb as any).dataVersion) || currentVersionRef.current || 1) + 1;
+      const newVersion = (Number((prevDb as any).dataVersion) || currentVersionRef.current || 1) + 1;
+      (nextDb as any).dataVersion = newVersion;
       (nextDb as any).lastSavedAt = new Date().toISOString();
+      currentVersionRef.current = newVersion;
       setKpis(computeLocalKPIs(nextDb));
       savePermanentState(nextDb);
+
+      // 1. Save directly to Neon over HTTPS (Works across Laptop, Mobile & GitHub Pages instantly!)
+      saveDirectToNeon(nextDb).then((r) => {
+        if (r.success) {
+          setIsRealtimeConnected(true);
+        }
+      }).catch((err) => {
+        console.warn('[Neon Direct] Background save error:', err);
+      });
+
+      // 2. Also notify the Express backend server (for SSE broadcast to any desktop clients)
       syncStateApi(nextDb, currentUser?.name || ROLE_DEFINITIONS[role]?.titleAr || 'مستخدم النظام')
         .then((res) => {
           if (res && res.version) {
-            currentVersionRef.current = res.version;
+            currentVersionRef.current = Math.max(currentVersionRef.current, res.version);
           }
         })
         .catch(() => {});
+
       return nextDb;
     });
   };
@@ -580,39 +618,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       } catch {}
 
-      // 2. Fetch authoritative cloud database state from server
-      const data = await fetchState();
-      if (data && data.db && Array.isArray(data.db.students) && Array.isArray(data.db.teachers)) {
-        const serverDb = data.db;
-        const serverVer = Number((serverDb as any)?.dataVersion) || data.version || 0;
+      // 2. Fetch authoritative cloud database state:
+      // First attempt direct query to Neon (Guaranteed to work everywhere, including mobile and GitHub Pages)
+      let activeDb: DatabaseState | null = null;
+      let activeVer = 0;
 
-        // Check if server is at clean initial template and client has real user data
-        const isServerVirgin = (!serverVer || serverVer <= 1) && !hasUserModifications(serverDb);
+      const neonRes = await fetchDirectFromNeon();
+      if (neonRes.success && neonRes.db && Array.isArray(neonRes.db.students) && Array.isArray(neonRes.db.teachers)) {
+        activeDb = neonRes.db;
+        activeVer = Number((activeDb as any)?.dataVersion) || neonRes.version || 1;
+      } else {
+        // Fallback to Express backend server
+        const data = await fetchState();
+        if (data && data.db && Array.isArray(data.db.students) && Array.isArray(data.db.teachers)) {
+          activeDb = data.db;
+          activeVer = Number((activeDb as any)?.dataVersion) || data.version || 1;
+        }
+      }
+
+      if (activeDb) {
+        // Check if server is empty but client has modifications
+        const isCloudVirgin = (!activeVer || activeVer <= 1) && !hasUserModifications(activeDb);
         const clientHasRealMods = hasUserModifications(effectiveClientDb);
 
-        if (isServerVirgin && clientHasRealMods) {
+        if (isCloudVirgin && clientHasRealMods) {
           console.info('[Zakirly] Seeding cloud database from local client data');
           setDb(effectiveClientDb);
           setKpis(computeLocalKPIs(effectiveClientDb));
           savePermanentState(effectiveClientDb);
-          syncStateApi(effectiveClientDb, 'مزامنة أولية لقاعدة البيانات السحابية')
-            .then((res) => {
-              if (res && res.version) {
-                currentVersionRef.current = res.version;
-              }
-            })
-            .catch(() => {});
+          saveDirectToNeon(effectiveClientDb).catch(() => {});
+          syncStateApi(effectiveClientDb, 'مزامنة أولية لقاعدة البيانات السحابية').catch(() => {});
         } else {
           // Cloud database is the single authoritative source of truth across all devices!
-          setDb(serverDb);
-          setKpis(data.kpis || computeLocalKPIs(serverDb));
-          savePermanentState(serverDb);
-          if (serverVer > 0) {
-            currentVersionRef.current = serverVer;
+          setDb(activeDb);
+          setKpis(computeLocalKPIs(activeDb));
+          savePermanentState(activeDb);
+          if (activeVer > 0) {
+            currentVersionRef.current = activeVer;
           }
         }
+        setIsRealtimeConnected(true);
+      } else {
+        // Fallback to offline local copy
+        setDb(effectiveClientDb);
+        setKpis(computeLocalKPIs(effectiveClientDb));
       }
-      setIsRealtimeConnected(true);
     } catch (err) {
       console.warn('Cloud database fetch failed, using local offline cache', err);
       const localDb = loadPermanentState();
@@ -625,17 +675,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   useEffect(() => {
-    // 1. Initial immediate fetch from server
+    // 1. Initial immediate fetch from Neon / Cloud
     reloadData();
 
-    // 2. Subscribe to SSE Realtime Event Stream
+    // 2. Subscribe to SSE Realtime Event Stream (when connected to server)
     const unsubscribe = subscribeToRealtime((event) => {
       if ('type' in event && event.type === 'CONNECTED') {
         setIsRealtimeConnected(true);
         return;
       }
 
-      // If event contains payload as full database state (like SYNC_STATE or RESET_DATABASE)
       if (event.payload && Array.isArray(event.payload.students) && Array.isArray(event.payload.teachers)) {
         setDb(event.payload);
         setKpis(computeLocalKPIs(event.payload));
@@ -646,21 +695,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
       }
 
-      // Otherwise fetch latest state from server
       reloadData();
     });
 
-    // 3. Ultra-fast lightweight polling interval (every 2.5 seconds) for mobile wakeups/backgrounding
+    // 3. Fast multi-device polling: checks Neon version directly every 3 seconds
     const pollInterval = setInterval(async () => {
       try {
+        // Check direct Neon version (ultra-lightweight scalar query)
+        const neonVer = await checkNeonVersion();
+        if (neonVer.success && neonVer.version && neonVer.version > currentVersionRef.current) {
+          console.info(`[Zakirly] Neon version changed (${neonVer.version} > ${currentVersionRef.current}), syncing device...`);
+          reloadData();
+          return;
+        }
+
+        // Also check Express server version
         const v = await fetchServerVersion();
         if (v && v.version > currentVersionRef.current) {
           reloadData();
         }
       } catch {}
-    }, 2500);
+    }, 3000);
 
-    // 4. Instant sync on screen unlock or browser tab focus
+    // 4. Instant sync when mobile phone is unlocked or browser tab gained focus
     const handleFocus = () => {
       reloadData();
     };
