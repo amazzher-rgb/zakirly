@@ -16,6 +16,7 @@ import {
   savePermanentState,
   loadPermanentState,
   shouldPreserveClientState,
+  hasUserModifications,
   loadFromIndexedDB,
 } from '../utils/persistentStorage';
 import {
@@ -23,6 +24,9 @@ import {
   fetchServerVersion,
   syncStateApi,
   subscribeToRealtime,
+  fetchSqlStatus,
+  testNeonConnectionApi,
+  switchNeonDatabaseApi,
   completeSessionWorkflow,
   processPaymentWorkflow,
   convertTrialWorkflow,
@@ -171,6 +175,21 @@ interface AppContextType {
   updateDatabaseState: (updater: (draft: DatabaseState) => void) => void;
   resetDatabase: () => Promise<any>;
   importBackup: (backupJson: any) => Promise<any>;
+
+  // Realtime Cloud Synchronization & Multi-Device
+  isSyncing: boolean;
+  reloadData: () => Promise<void>;
+  cloudDbStatus: {
+    success: boolean;
+    database?: string;
+    status?: string;
+    latencyMs?: number;
+    tablesCount?: number;
+    message?: string;
+  } | null;
+  refreshCloudDbStatus: () => Promise<any>;
+  testNeonConnection: (connectionString: string) => Promise<any>;
+  switchNeonDatabase: (connectionString: string) => Promise<any>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -494,13 +513,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const currentVersionRef = useRef<number>(0);
   const isSyncingRef = useRef<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [cloudDbStatus, setCloudDbStatus] = useState<any>(null);
+
+  const refreshCloudDbStatus = async () => {
+    try {
+      const status = await fetchSqlStatus();
+      setCloudDbStatus(status);
+      return status;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const testNeonConnection = async (connStr: string) => {
+    return await testNeonConnectionApi(connStr);
+  };
+
+  const switchNeonDatabase = async (connStr: string) => {
+    const res = await switchNeonDatabaseApi(connStr);
+    if (res.success) {
+      await refreshCloudDbStatus();
+      await reloadData();
+    }
+    return res;
+  };
+
+  useEffect(() => {
+    refreshCloudDbStatus();
+  }, []);
 
   const updateDatabaseState = (updater: (draft: DatabaseState) => void) => {
     setDb((prevDb) => {
       const nextDb: DatabaseState = JSON.parse(JSON.stringify(prevDb));
       updater(nextDb);
       (nextDb as any)._userModified = true;
-      (nextDb as any).dataVersion = (Number((prevDb as any).dataVersion) || 1) + 1;
+      (nextDb as any).dataVersion = (Number((prevDb as any).dataVersion) || currentVersionRef.current || 1) + 1;
       (nextDb as any).lastSavedAt = new Date().toISOString();
       setKpis(computeLocalKPIs(nextDb));
       savePermanentState(nextDb);
@@ -515,13 +563,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
-  // Authoritative Server Fetch & Bidirectional Intelligent Sync
+  // Authoritative Cloud Database Synchronization across all devices (laptop, mobile, tablet)
   const reloadData = async () => {
     if (isSyncingRef.current) return;
     try {
       isSyncingRef.current = true;
+      setIsSyncing(true);
 
-      // 1. Gather all local browser storage layers (localStorage & IndexedDB)
+      // 1. Gather local browser storage layers
       const localDb = loadPermanentState();
       let effectiveClientDb = localDb;
       try {
@@ -531,18 +580,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       } catch {}
 
-      // 2. Fetch server database state
+      // 2. Fetch authoritative cloud database state from server
       const data = await fetchState();
       if (data && data.db && Array.isArray(data.db.students) && Array.isArray(data.db.teachers)) {
         const serverDb = data.db;
+        const serverVer = Number((serverDb as any)?.dataVersion) || data.version || 0;
 
-        // 3. Determine whether the client's local user-modified state should take precedence
-        if (shouldPreserveClientState(effectiveClientDb, serverDb)) {
-          console.info('[Zakirly] Retaining local client data & syncing to backend server');
+        // Check if server is at clean initial template and client has real user data
+        const isServerVirgin = (!serverVer || serverVer <= 1) && !hasUserModifications(serverDb);
+        const clientHasRealMods = hasUserModifications(effectiveClientDb);
+
+        if (isServerVirgin && clientHasRealMods) {
+          console.info('[Zakirly] Seeding cloud database from local client data');
           setDb(effectiveClientDb);
           setKpis(computeLocalKPIs(effectiveClientDb));
           savePermanentState(effectiveClientDb);
-          syncStateApi(effectiveClientDb, 'استعادة تلقائية ومزامنة للبيانات المحفوظة')
+          syncStateApi(effectiveClientDb, 'مزامنة أولية لقاعدة البيانات السحابية')
             .then((res) => {
               if (res && res.version) {
                 currentVersionRef.current = res.version;
@@ -550,23 +603,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             })
             .catch(() => {});
         } else {
-          // Server state is authoritative / newer
+          // Cloud database is the single authoritative source of truth across all devices!
           setDb(serverDb);
           setKpis(data.kpis || computeLocalKPIs(serverDb));
           savePermanentState(serverDb);
-          if (data.version) {
-            currentVersionRef.current = data.version;
+          if (serverVer > 0) {
+            currentVersionRef.current = serverVer;
           }
         }
       }
       setIsRealtimeConnected(true);
     } catch (err) {
-      console.warn('Backend server fetch failed, using local offline cache', err);
+      console.warn('Cloud database fetch failed, using local offline cache', err);
       const localDb = loadPermanentState();
       setDb(localDb);
       setKpis(computeLocalKPIs(localDb));
     } finally {
       isSyncingRef.current = false;
+      setIsSyncing(false);
     }
   };
 
@@ -1579,6 +1633,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateDatabaseState,
         resetDatabase,
         importBackup,
+        isSyncing,
+        reloadData,
+        cloudDbStatus,
+        refreshCloudDbStatus,
+        testNeonConnection,
+        switchNeonDatabase,
       }}
     >
       {children}

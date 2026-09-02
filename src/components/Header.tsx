@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Logo } from './Logo';
 import { GoogleSheetsModal } from './GoogleSheetsModal';
+import { DatabaseSyncModal } from './DatabaseSyncModal';
 import {
   Bell,
   Search,
@@ -20,6 +21,7 @@ import {
   Lock,
   FileSpreadsheet,
   Coins,
+  Database,
 } from 'lucide-react';
 import { CURRENCIES } from '../utils/currencyUtils';
 
@@ -47,6 +49,7 @@ export const Header: React.FC = () => {
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isChangePassOpen, setIsChangePassOpen] = useState(false);
   const [isSheetsModalOpen, setIsSheetsModalOpen] = useState(false);
+  const [isDbModalOpen, setIsDbModalOpen] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -186,19 +189,17 @@ export const Header: React.FC = () => {
             <Search className="w-4 h-4" />
           </button>
 
-          {/* Realtime Live Sync Status Badge */}
-          <div
-            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold border transition-all ${
+          {/* Realtime Live Sync & Database Status Button */}
+          <button
+            onClick={() => setIsDbModalOpen(true)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold border transition-all cursor-pointer shadow-xs hover:shadow-sm ${
               isRealtimeConnected
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-amber-50 text-amber-700 border-amber-200'
+                ? 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border-emerald-200'
+                : 'bg-amber-50 hover:bg-amber-100/80 text-amber-800 border-amber-200'
             }`}
-            title={
-              isRealtimeConnected
-                ? 'النظام متصل بالخادم ويقوم بالتحديث اللحظي لجميع التغييرات'
-                : 'جارٍ جلب البيانات الحية...'
-            }
+            title={lang === 'ar' ? 'إعدادات المزامنة السحابية وقاعدة البيانات (Cloud SQL / Neon)' : 'Cloud Sync & Database Settings'}
           >
+            <Database className="w-3.5 h-3.5 text-blue-600 shrink-0" />
             <span className="relative flex h-2 w-2">
               <span
                 className={`animate-ping absolute inline-flex h-full w-full rounded-full ${
@@ -212,9 +213,9 @@ export const Header: React.FC = () => {
               ></span>
             </span>
             <span className="hidden sm:inline">
-              {lang === 'ar' ? 'متصل لحظياً' : 'Live Sync'}
+              {lang === 'ar' ? 'مزامنة السحابة' : 'Cloud Sync'}
             </span>
-          </div>
+          </button>
 
           {/* Google Sheets Sync Button */}
           <button
@@ -426,6 +427,9 @@ export const Header: React.FC = () => {
 
       {/* Google Sheets Modal */}
       <GoogleSheetsModal isOpen={isSheetsModalOpen} onClose={() => setIsSheetsModalOpen(false)} />
+
+      {/* Cloud Database & Realtime Sync Modal */}
+      <DatabaseSyncModal isOpen={isDbModalOpen} onClose={() => setIsDbModalOpen(false)} />
     </header>
   );
 };

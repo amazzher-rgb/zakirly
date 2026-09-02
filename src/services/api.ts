@@ -1,5 +1,41 @@
 import { DatabaseState, RealtimeEvent, SystemKPIs } from '../types';
 
+export const CLOUD_BACKEND_URL = 'https://ais-pre-uhw3xzpve2e5yzykao4yed-534567286396.europe-west2.run.app';
+
+export function getApiBaseUrl(): string {
+  try {
+    const custom = localStorage.getItem('zakirly_backend_api_url');
+    if (custom && custom.trim()) {
+      return custom.trim().replace(/\/+$/, '');
+    }
+  } catch {}
+
+  // If in browser:
+  if (typeof window !== 'undefined') {
+    // If running on GitHub Pages, pages.dev, or local file, route to the cloud backend
+    if (
+      window.location.hostname.includes('github.io') ||
+      window.location.hostname.includes('pages.dev') ||
+      window.location.protocol === 'file:'
+    ) {
+      return CLOUD_BACKEND_URL;
+    }
+  }
+
+  // Same origin (e.g. running directly on Cloud Run or dev proxy)
+  return '';
+}
+
+export function setCustomBackendUrl(url: string | null): void {
+  try {
+    if (url && url.trim()) {
+      localStorage.setItem('zakirly_backend_api_url', url.trim());
+    } else {
+      localStorage.removeItem('zakirly_backend_api_url');
+    }
+  } catch {}
+}
+
 export async function fetchState(): Promise<{
   db: DatabaseState;
   kpis: SystemKPIs;
@@ -7,7 +43,8 @@ export async function fetchState(): Promise<{
   lastSavedAt?: string;
 }> {
   try {
-    const res = await fetch(`/api/state?t=${Date.now()}`);
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/state?t=${Date.now()}`);
     if (!res.ok) throw new Error('Failed to fetch state');
     const data = await res.json();
     return {
@@ -27,7 +64,8 @@ export async function fetchServerVersion(): Promise<{
   lastSavedAt: string;
 } | null> {
   try {
-    const res = await fetch(`/api/state/version?t=${Date.now()}`);
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/state/version?t=${Date.now()}`);
     if (!res.ok) return null;
     const data = await res.json();
     return {
@@ -48,7 +86,8 @@ export async function syncStateApi(
   kpis?: SystemKPIs;
   version?: number;
 }> {
-  const res = await fetch('/api/state/sync', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/state/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ db: clientDb, performedBy }),
@@ -66,7 +105,8 @@ export function subscribeToRealtime(
   const connect = () => {
     if (isClosed) return;
     try {
-      eventSource = new EventSource('/api/realtime');
+      const base = getApiBaseUrl();
+      eventSource = new EventSource(`${base}/api/realtime`);
 
       eventSource.onmessage = (e) => {
         try {
@@ -108,13 +148,65 @@ export function subscribeToRealtime(
   };
 }
 
+export async function fetchSqlStatus(): Promise<{
+  success: boolean;
+  database?: string;
+  status?: string;
+  latencyMs?: number;
+  tablesCount?: number;
+  message?: string;
+}> {
+  try {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/sql/status?t=${Date.now()}`);
+    return await res.json();
+  } catch (err: any) {
+    return {
+      success: false,
+      database: 'Cloud SQL / Neon',
+      status: 'error',
+      message: err.message,
+    };
+  }
+}
+
+export async function testNeonConnectionApi(connectionString: string): Promise<{
+  success: boolean;
+  type?: string;
+  latencyMs?: number;
+  message?: string;
+}> {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/db/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ connectionString }),
+  });
+  return res.json();
+}
+
+export async function switchNeonDatabaseApi(connectionString: string): Promise<{
+  success: boolean;
+  type?: string;
+  message?: string;
+}> {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/db/switch-neon`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ connectionString }),
+  });
+  return res.json();
+}
+
 export async function completeSessionWorkflow(payload: {
   sessionId: string;
   attendanceStatus?: string;
   notes?: string;
   performedBy?: string;
 }) {
-  const res = await fetch('/api/workflows/complete-session', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/workflows/complete-session`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -129,7 +221,8 @@ export async function processPaymentWorkflow(payload: {
   notes?: string;
   performedBy?: string;
 }) {
-  const res = await fetch('/api/workflows/process-payment', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/workflows/process-payment`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -146,7 +239,8 @@ export async function convertTrialWorkflow(payload: {
   currency?: string;
   performedBy?: string;
 }) {
-  const res = await fetch('/api/workflows/convert-trial', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/workflows/convert-trial`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -159,7 +253,8 @@ export async function runPayrollWorkflow(payload: {
   year: number;
   performedBy?: string;
 }) {
-  const res = await fetch('/api/workflows/run-payroll', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/workflows/run-payroll`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -168,7 +263,8 @@ export async function runPayrollWorkflow(payload: {
 }
 
 export async function createStudentApi(studentData: any) {
-  const res = await fetch('/api/students', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/students`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(studentData),
@@ -177,7 +273,8 @@ export async function createStudentApi(studentData: any) {
 }
 
 export async function createTeacherApi(teacherData: any) {
-  const res = await fetch('/api/teachers', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/teachers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(teacherData),
@@ -186,7 +283,8 @@ export async function createTeacherApi(teacherData: any) {
 }
 
 export async function createSessionApi(sessionData: any) {
-  const res = await fetch('/api/sessions', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(sessionData),
@@ -195,7 +293,8 @@ export async function createSessionApi(sessionData: any) {
 }
 
 export async function resetDatabaseApi(performedBy?: string) {
-  const res = await fetch('/api/state/reset', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/state/reset`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ performedBy }),
@@ -204,7 +303,8 @@ export async function resetDatabaseApi(performedBy?: string) {
 }
 
 export async function importBackupApi(backupJson: any) {
-  const res = await fetch('/api/backup/import', {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/backup/import`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(backupJson),

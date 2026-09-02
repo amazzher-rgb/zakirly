@@ -20,6 +20,7 @@ import {
   Parent,
 } from './src/types';
 import { loadStateFromSql, saveStateToSql } from './src/db/storage';
+import { testConnection, switchDatabaseUrl } from './src/db/index';
 
 // Initial in-memory state setup
 let db: DatabaseState = JSON.parse(JSON.stringify(initialDatabaseState));
@@ -123,11 +124,23 @@ async function startServer() {
 
   app.use(express.json());
 
+  // CORS middleware for cross-origin synchronization across devices and domains (GitHub Pages, mobile, laptop)
+  app.use((req: Request, res: Response, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   // Realtime Server-Sent Events Endpoint
   app.get('/api/realtime', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.flushHeaders();
 
     const clientId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -174,36 +187,98 @@ async function startServer() {
     });
   });
 
-  // SQL Database Connectivity Status
+  // SQL & Cloud Database Connectivity Status
   app.get('/api/sql/status', async (req: Request, res: Response) => {
     try {
-      const isHealthy = await saveStateToSql(db);
+      const isNeon = (process.env.DATABASE_URL || '').includes('neon.tech');
+      const activeType = isNeon ? 'Neon (Serverless PostgreSQL)' : 'Google Cloud SQL (PostgreSQL)';
+      const connTest = await testConnection();
+
       res.json({
-        success: true,
-        database: 'Cloud SQL (PostgreSQL)',
-        status: isHealthy ? 'connected' : 'local_fallback',
+        success: connTest.success,
+        database: activeType,
+        status: connTest.success ? 'connected' : 'local_fallback',
+        latencyMs: connTest.latencyMs,
+        tablesCount: connTest.tablesCount,
         timestamp: new Date().toISOString(),
       });
     } catch (e: any) {
       res.json({
         success: false,
-        database: 'Cloud SQL (PostgreSQL)',
+        database: 'Cloud SQL / Neon (PostgreSQL)',
         status: 'error',
         message: 'SQL check handled safely',
       });
     }
   });
 
-  // Sync state from client
-  app.post('/api/state/sync', (req: Request, res: Response) => {
+  // Test custom Neon or PostgreSQL connection string
+  app.post('/api/db/test', async (req: Request, res: Response) => {
+    try {
+      const { connectionString } = req.body;
+      const result = await testConnection(connectionString);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // Switch database connection to Neon dynamically
+  app.post('/api/db/switch-neon', async (req: Request, res: Response) => {
+    try {
+      const { connectionString } = req.body;
+      if (!connectionString || !connectionString.startsWith('postgres')) {
+        return res.status(400).json({
+          success: false,
+          message: 'رابط الاتصال يجب أن يبدأ بـ postgresql://',
+        });
+      }
+
+      // 1. Test connection first
+      const testRes = await testConnection(connectionString);
+      if (!testRes.success) {
+        return res.status(400).json({
+          success: false,
+          message: `فشل الاتصال بـ Neon: ${testRes.message}`,
+        });
+      }
+
+      // 2. Switch pool and drizzle instance
+      const switchRes = switchDatabaseUrl(connectionString);
+      if (!switchRes.success) {
+        return res.status(500).json(switchRes);
+      }
+
+      // 3. Save current state to new database
+      await saveStateToSql(db);
+
+      res.json({
+        success: true,
+        message: 'تم ربط قاعدة بيانات Neon بنجاح ونقل جميع البيانات إليها!',
+        type: 'Neon (Serverless PostgreSQL)',
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // Sync state from client (Authoritative update across all devices)
+  app.post('/api/state/sync', async (req: Request, res: Response) => {
     try {
       const payload = req.body;
       const clientDb = payload?.db || payload;
       const performedBy = payload?.performedBy || req.body?.performedBy || 'مستخدم النظام';
 
       if (clientDb && Array.isArray(clientDb.students) && Array.isArray(clientDb.teachers)) {
+        serverVersion++;
+        (clientDb as any)._userModified = true;
+        (clientDb as any).dataVersion = serverVersion;
+        (clientDb as any).lastSavedAt = new Date().toISOString();
         db = clientDb;
-        savePersistentDb(db);
+
+        // Persist to PostgreSQL (Cloud SQL / Neon)
+        await saveStateToSql(db);
+
         const kpis = calculateKPIs(db);
 
         // Broadcast immediately to ALL other connected clients (laptops, phones, tablets)
