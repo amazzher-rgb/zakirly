@@ -23,6 +23,8 @@ export function setActiveNeonConnectionString(connStr: string | null): void {
       localStorage.removeItem('zakirly_neon_connection_string');
     }
   } catch {}
+  cachedSql = null;
+  currentConnUrl = '';
 }
 
 let cachedSql: NeonQueryFunction<false, false> | null = null;
@@ -35,6 +37,24 @@ function getSql(): NeonQueryFunction<false, false> {
     cachedSql = neon(activeUrl);
   }
   return cachedSql;
+}
+
+let hasEnsuredTable = false;
+export async function ensureNeonTableExists(): Promise<void> {
+  if (hasEnsuredTable) return;
+  try {
+    const sql = getSql();
+    await sql`
+      CREATE TABLE IF NOT EXISTS app_state_store (
+        key TEXT PRIMARY KEY,
+        value JSONB NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+    `;
+    hasEnsuredTable = true;
+  } catch (err) {
+    console.warn('[Neon Direct] Table check warning:', err);
+  }
 }
 
 /**
@@ -50,7 +70,7 @@ export async function fetchDirectFromNeon(): Promise<{
   try {
     const sql = getSql();
     const rows = await sql`
-      SELECT key, updated_at, value
+      SELECT key, updated_at::text as updated_at, value
       FROM app_state_store
       WHERE key = 'main_database_state'
       LIMIT 1;
@@ -63,7 +83,7 @@ export async function fetchDirectFromNeon(): Promise<{
         success: true,
         db,
         version: ver,
-        updatedAt: rows[0].updated_at,
+        updatedAt: String(rows[0].updated_at || ''),
       };
     }
 
@@ -92,7 +112,7 @@ export async function checkNeonVersion(): Promise<{
   try {
     const sql = getSql();
     const rows = await sql`
-      SELECT updated_at, (value->>'dataVersion')::int as version
+      SELECT updated_at::text as updated_at, COALESCE((value->>'dataVersion')::bigint, 1) as version
       FROM app_state_store
       WHERE key = 'main_database_state'
       LIMIT 1;
@@ -102,7 +122,7 @@ export async function checkNeonVersion(): Promise<{
       return {
         success: true,
         version: Number(rows[0].version) || 1,
-        updatedAt: rows[0].updated_at,
+        updatedAt: String(rows[0].updated_at || ''),
       };
     }
     return { success: false };
@@ -111,47 +131,48 @@ export async function checkNeonVersion(): Promise<{
   }
 }
 
+// Sequential queue for saves to prevent out-of-order writes
+let saveQueue = Promise.resolve<any>(null);
+
 /**
  * Save state directly to Neon Database over HTTPS
  */
-export async function saveDirectToNeon(db: DatabaseState): Promise<{
+export function saveDirectToNeon(db: DatabaseState): Promise<{
   success: boolean;
   error?: string;
   updatedAt?: string;
+  version?: number;
 }> {
-  try {
-    const sql = getSql();
-    const serialized = JSON.stringify(db);
-    
-    // Ensure table exists
-    await sql`
-      CREATE TABLE IF NOT EXISTS app_state_store (
-        key TEXT PRIMARY KEY,
-        value JSONB NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      );
-    `;
+  saveQueue = saveQueue.then(async () => {
+    try {
+      await ensureNeonTableExists();
+      const sql = getSql();
+      const serialized = JSON.stringify(db);
 
-    // Upsert the state
-    const res = await sql`
-      INSERT INTO app_state_store (key, value, updated_at)
-      VALUES ('main_database_state', ${serialized}::jsonb, NOW())
-      ON CONFLICT (key) DO UPDATE
-      SET value = EXCLUDED.value, updated_at = NOW()
-      RETURNING updated_at;
-    `;
+      const res = await sql`
+        INSERT INTO app_state_store (key, value, updated_at)
+        VALUES ('main_database_state', ${serialized}::jsonb, NOW())
+        ON CONFLICT (key) DO UPDATE
+        SET value = EXCLUDED.value, updated_at = NOW()
+        RETURNING updated_at::text as updated_at, (value->>'dataVersion')::bigint as version;
+      `;
 
-    return {
-      success: true,
-      updatedAt: res[0]?.updated_at,
-    };
-  } catch (err: any) {
-    console.error('[Neon Direct] Save error:', err);
-    return {
-      success: false,
-      error: err?.message || 'Failed to save to Neon',
-    };
-  }
+      const row = res && res[0];
+      return {
+        success: true,
+        updatedAt: row ? String(row.updated_at) : new Date().toISOString(),
+        version: row ? Number(row.version) : Number((db as any)?.dataVersion) || 1,
+      };
+    } catch (err: any) {
+      console.error('[Neon Direct] Save error:', err);
+      return {
+        success: false,
+        error: err?.message || 'Failed to save to Neon',
+      };
+    }
+  });
+
+  return saveQueue;
 }
 
 /**
@@ -171,7 +192,7 @@ export async function testDirectNeonConnection(customConnStr?: string): Promise<
     return {
       success: true,
       latencyMs,
-      message: 'متصل بنجاح بقاعدة بيانات Neon',
+      message: 'متصل بنجاح بسحابة Neon المباشرة',
     };
   } catch (err: any) {
     return {

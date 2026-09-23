@@ -519,6 +519,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [kpis, setKpis] = useState<SystemKPIs>(computeLocalKPIs(initialDatabaseState));
 
   const currentVersionRef = useRef<number>(0);
+  const lastSyncedUpdatedAtRef = useRef<string>('');
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const isSyncingRef = useRef<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [cloudDbStatus, setCloudDbStatus] = useState<any>(null);
@@ -579,10 +581,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setKpis(computeLocalKPIs(nextDb));
       savePermanentState(nextDb);
 
+      // Instant cross-tab broadcast (0ms sync to other tabs/windows on this device)
+      try {
+        broadcastChannelRef.current?.postMessage({
+          type: 'CROSS_TAB_SYNC',
+          version: newVersion,
+          updatedAt: (nextDb as any).lastSavedAt,
+          db: nextDb,
+        });
+      } catch {}
+
       // 1. Save directly to Neon over HTTPS (Works across Laptop, Mobile & GitHub Pages instantly!)
       saveDirectToNeon(nextDb).then((r) => {
         if (r.success) {
           setIsRealtimeConnected(true);
+          if (r.updatedAt) {
+            lastSyncedUpdatedAtRef.current = r.updatedAt;
+          }
+          if (r.version) {
+            currentVersionRef.current = Math.max(currentVersionRef.current, r.version);
+          }
         }
       }).catch((err) => {
         console.warn('[Neon Direct] Background save error:', err);
@@ -627,13 +645,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (neonRes.success && neonRes.db && Array.isArray(neonRes.db.students) && Array.isArray(neonRes.db.teachers)) {
         activeDb = neonRes.db;
         activeVer = Number((activeDb as any)?.dataVersion) || neonRes.version || 1;
+        if (neonRes.updatedAt) {
+          lastSyncedUpdatedAtRef.current = neonRes.updatedAt;
+        }
       } else {
         // Fallback to Express backend server
-        const data = await fetchState();
-        if (data && data.db && Array.isArray(data.db.students) && Array.isArray(data.db.teachers)) {
-          activeDb = data.db;
-          activeVer = Number((activeDb as any)?.dataVersion) || data.version || 1;
-        }
+        try {
+          const data = await fetchState();
+          if (data && data.db && Array.isArray(data.db.students) && Array.isArray(data.db.teachers)) {
+            activeDb = data.db;
+            activeVer = Number((activeDb as any)?.dataVersion) || data.version || 1;
+          }
+        } catch {}
       }
 
       if (activeDb) {
@@ -654,7 +677,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setKpis(computeLocalKPIs(activeDb));
           savePermanentState(activeDb);
           if (activeVer > 0) {
-            currentVersionRef.current = activeVer;
+            currentVersionRef.current = Math.max(currentVersionRef.current, activeVer);
           }
         }
         setIsRealtimeConnected(true);
@@ -675,10 +698,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   useEffect(() => {
-    // 1. Initial immediate fetch from Neon / Cloud
+    // 1. Setup cross-tab BroadcastChannel for 0ms sync across tabs on same device
+    if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+      try {
+        const channel = new BroadcastChannel('zakirly_cross_tab_sync');
+        broadcastChannelRef.current = channel;
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'CROSS_TAB_SYNC' && event.data?.db) {
+            const incomingDb = event.data.db;
+            const incomingVer = Number(event.data.version) || Number((incomingDb as any)?.dataVersion) || 1;
+            if (incomingVer > currentVersionRef.current) {
+              currentVersionRef.current = incomingVer;
+              if (event.data.updatedAt) {
+                lastSyncedUpdatedAtRef.current = event.data.updatedAt;
+              }
+              setDb(incomingDb);
+              setKpis(computeLocalKPIs(incomingDb));
+              savePermanentState(incomingDb);
+            }
+          }
+        };
+      } catch {}
+    }
+
+    // 2. Initial immediate fetch from Neon / Cloud
     reloadData();
 
-    // 2. Subscribe to SSE Realtime Event Stream (when connected to server)
+    // 3. Subscribe to SSE Realtime Event Stream (when connected to server)
     const unsubscribe = subscribeToRealtime((event) => {
       if ('type' in event && event.type === 'CONNECTED') {
         setIsRealtimeConnected(true);
@@ -698,26 +744,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       reloadData();
     });
 
-    // 3. Fast multi-device polling: checks Neon version directly every 3 seconds
+    // 4. Ultra-fast multi-device polling: checks Neon version directly every 1.5 seconds
     const pollInterval = setInterval(async () => {
       try {
         // Check direct Neon version (ultra-lightweight scalar query)
         const neonVer = await checkNeonVersion();
-        if (neonVer.success && neonVer.version && neonVer.version > currentVersionRef.current) {
-          console.info(`[Zakirly] Neon version changed (${neonVer.version} > ${currentVersionRef.current}), syncing device...`);
-          reloadData();
-          return;
+        if (neonVer.success) {
+          const hasNewerVersion = Number(neonVer.version) > currentVersionRef.current;
+          const hasNewerTimestamp = Boolean(
+            neonVer.updatedAt &&
+            lastSyncedUpdatedAtRef.current &&
+            neonVer.updatedAt !== lastSyncedUpdatedAtRef.current
+          );
+
+          if (hasNewerVersion || hasNewerTimestamp) {
+            console.info(`[Zakirly] Neon cloud change detected (ver: ${neonVer.version}, updated: ${neonVer.updatedAt}), syncing...`);
+            reloadData();
+            return;
+          }
         }
 
-        // Also check Express server version
+        // Also check Express server version if present
         const v = await fetchServerVersion();
         if (v && v.version > currentVersionRef.current) {
           reloadData();
         }
       } catch {}
-    }, 3000);
+    }, 1500);
 
-    // 4. Instant sync when mobile phone is unlocked or browser tab gained focus
+    // 5. Instant sync when mobile phone is unlocked, tab focused, or touched
     const handleFocus = () => {
       reloadData();
     };
@@ -726,14 +781,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         reloadData();
       }
     };
+
+    let lastTouchCheck = 0;
+    const handleTouchOrClick = () => {
+      const now = Date.now();
+      if (now - lastTouchCheck > 2500) {
+        lastTouchCheck = now;
+        checkNeonVersion().then((neonVer) => {
+          if (neonVer.success) {
+            if (
+              Number(neonVer.version) > currentVersionRef.current ||
+              (neonVer.updatedAt && lastSyncedUpdatedAtRef.current && neonVer.updatedAt !== lastSyncedUpdatedAtRef.current)
+            ) {
+              reloadData();
+            }
+          }
+        }).catch(() => {});
+      }
+    };
+
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pointerdown', handleTouchOrClick, { passive: true });
 
     return () => {
       unsubscribe();
       clearInterval(pollInterval);
+      if (broadcastChannelRef.current) {
+        try {
+          broadcastChannelRef.current.close();
+        } catch {}
+      }
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pointerdown', handleTouchOrClick);
     };
   }, []);
 

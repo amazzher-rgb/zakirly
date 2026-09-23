@@ -1,6 +1,19 @@
 import { DatabaseState, RealtimeEvent, SystemKPIs } from '../types';
 
-export const CLOUD_BACKEND_URL = 'https://ais-pre-uhw3xzpve2e5yzykao4yed-534567286396.europe-west2.run.app';
+export const CLOUD_BACKEND_URL = '';
+
+export function isStaticDeployment(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const custom = localStorage.getItem('zakirly_backend_api_url');
+    if (custom && custom.trim()) return false;
+  } catch {}
+  return (
+    window.location.hostname.includes('github.io') ||
+    window.location.hostname.includes('pages.dev') ||
+    window.location.protocol === 'file:'
+  );
+}
 
 export function getApiBaseUrl(): string {
   try {
@@ -12,17 +25,17 @@ export function getApiBaseUrl(): string {
 
   // If in browser:
   if (typeof window !== 'undefined') {
-    // If running on GitHub Pages, pages.dev, or local file, route to the cloud backend
+    // If running on GitHub Pages, pages.dev, or local file, there is no Express server at this origin
     if (
       window.location.hostname.includes('github.io') ||
       window.location.hostname.includes('pages.dev') ||
       window.location.protocol === 'file:'
     ) {
-      return CLOUD_BACKEND_URL;
+      return '';
     }
   }
 
-  // Same origin (e.g. running directly on Cloud Run or dev proxy)
+  // Same origin (e.g. running directly on Cloud Run, dev server)
   return '';
 }
 
@@ -42,6 +55,9 @@ export async function fetchState(): Promise<{
   version?: number;
   lastSavedAt?: string;
 }> {
+  if (isStaticDeployment()) {
+    throw new Error('Static deployment: state is managed directly via Neon PostgreSQL');
+  }
   try {
     const base = getApiBaseUrl();
     const res = await fetch(`${base}/api/state?t=${Date.now()}`);
@@ -63,6 +79,9 @@ export async function fetchServerVersion(): Promise<{
   version: number;
   lastSavedAt: string;
 } | null> {
+  if (isStaticDeployment()) {
+    return null;
+  }
   try {
     const base = getApiBaseUrl();
     const res = await fetch(`${base}/api/state/version?t=${Date.now()}`);
@@ -86,18 +105,33 @@ export async function syncStateApi(
   kpis?: SystemKPIs;
   version?: number;
 }> {
-  const base = getApiBaseUrl();
-  const res = await fetch(`${base}/api/state/sync`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ db: clientDb, performedBy }),
-  });
-  return res.json();
+  if (isStaticDeployment()) {
+    return { success: true };
+  }
+  try {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/state/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ db: clientDb, performedBy }),
+    });
+    if (!res.ok) return { success: false };
+    return await res.json();
+  } catch {
+    return { success: false };
+  }
 }
 
 export function subscribeToRealtime(
   onEvent: (event: any) => void
 ): () => void {
+  if (isStaticDeployment()) {
+    // When on GitHub Pages without Express backend, SSE is not available;
+    // Neon direct polling & BroadcastChannel handle multi-device realtime sync!
+    onEvent({ type: 'CONNECTED' });
+    return () => {};
+  }
+
   let eventSource: EventSource | null = null;
   let isClosed = false;
   let reconnectTimeout: any = null;
@@ -205,6 +239,7 @@ export async function completeSessionWorkflow(payload: {
   notes?: string;
   performedBy?: string;
 }) {
+  if (isStaticDeployment()) throw new Error('Static deployment');
   const base = getApiBaseUrl();
   const res = await fetch(`${base}/api/workflows/complete-session`, {
     method: 'POST',
@@ -221,6 +256,7 @@ export async function processPaymentWorkflow(payload: {
   notes?: string;
   performedBy?: string;
 }) {
+  if (isStaticDeployment()) throw new Error('Static deployment');
   const base = getApiBaseUrl();
   const res = await fetch(`${base}/api/workflows/process-payment`, {
     method: 'POST',
@@ -239,6 +275,7 @@ export async function convertTrialWorkflow(payload: {
   currency?: string;
   performedBy?: string;
 }) {
+  if (isStaticDeployment()) throw new Error('Static deployment');
   const base = getApiBaseUrl();
   const res = await fetch(`${base}/api/workflows/convert-trial`, {
     method: 'POST',
@@ -253,6 +290,7 @@ export async function runPayrollWorkflow(payload: {
   year: number;
   performedBy?: string;
 }) {
+  if (isStaticDeployment()) throw new Error('Static deployment');
   const base = getApiBaseUrl();
   const res = await fetch(`${base}/api/workflows/run-payroll`, {
     method: 'POST',
@@ -263,6 +301,7 @@ export async function runPayrollWorkflow(payload: {
 }
 
 export async function createStudentApi(studentData: any) {
+  if (isStaticDeployment()) throw new Error('Static deployment');
   const base = getApiBaseUrl();
   const res = await fetch(`${base}/api/students`, {
     method: 'POST',
@@ -273,6 +312,7 @@ export async function createStudentApi(studentData: any) {
 }
 
 export async function createTeacherApi(teacherData: any) {
+  if (isStaticDeployment()) throw new Error('Static deployment');
   const base = getApiBaseUrl();
   const res = await fetch(`${base}/api/teachers`, {
     method: 'POST',
@@ -283,6 +323,7 @@ export async function createTeacherApi(teacherData: any) {
 }
 
 export async function createSessionApi(sessionData: any) {
+  if (isStaticDeployment()) throw new Error('Static deployment');
   const base = getApiBaseUrl();
   const res = await fetch(`${base}/api/sessions`, {
     method: 'POST',
