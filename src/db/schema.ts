@@ -260,5 +260,6 @@ export const auditLogs = pgTable('audit_logs', {
 export const appStateStore = pgTable('app_state_store', {
   key: text('key').primaryKey(),
   value: jsonb('value').notNull(),
+  version: integer('version').default(1),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

@@ -21,8 +21,18 @@ export const CoursesModule: React.FC = () => {
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [descriptionAr, setDescriptionAr] = useState('');
 
-  // Academic curricula only (not languages)
-  const academicCourses = db.courseSubjects.filter((c) => {
+  const isCoursesDepartment = activeTenantId === 'tenant-zakirly-courses';
+
+  // Dynamic courses based on active department
+  const displayedCourses = db.courseSubjects.filter((c) => {
+    const matchesQuery =
+      c.titleAr.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.code.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (isCoursesDepartment) {
+      return matchesQuery;
+    }
+
     const isAcademic =
       c.category === 'academic' ||
       c.category === 'curriculum' ||
@@ -31,19 +41,16 @@ export const CoursesModule: React.FC = () => {
       c.code.startsWith('MTH') ||
       c.code.startsWith('CS') ||
       c.code.startsWith('PHY');
-    const matchesQuery =
-      c.titleAr.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.code.toLowerCase().includes(searchQuery.toLowerCase());
     return isAcademic && matchesQuery;
   });
 
   const handleOpenAdd = () => {
     setEditingCourse(null);
-    setCode(`ACAD-${Math.floor(100 + Math.random() * 900)}`);
+    setCode(isCoursesDepartment ? `CRS-${Math.floor(100 + Math.random() * 900)}` : `ACAD-${Math.floor(100 + Math.random() * 900)}`);
     setTitleAr('');
     setTitleEn('');
-    setLevel('المرحلة الثانوية');
-    setPricePerSession(220);
+    setLevel(isCoursesDepartment ? 'دبلومة حرة / ورشة عمل' : 'المرحلة الثانوية');
+    setPricePerSession(250);
     setSuggestedDurationMinutes(60);
     setStatus('active');
     setDescriptionAr('');
@@ -86,12 +93,12 @@ export const CoursesModule: React.FC = () => {
       });
     } else {
       const newCourse: CourseSubject = {
-        id: `cs-acad-${Date.now()}`,
+        id: `cs-${isCoursesDepartment ? 'crs' : 'acad'}-${Date.now()}`,
         tenantId: activeTenantId,
         code,
         titleAr: titleAr.trim(),
         titleEn: titleEn.trim() || titleAr.trim(),
-        category: 'academic',
+        category: isCoursesDepartment ? 'language' : 'academic',
         level,
         pricePerSession: Number(pricePerSession),
         suggestedDurationMinutes: Number(suggestedDurationMinutes),
@@ -123,11 +130,15 @@ export const CoursesModule: React.FC = () => {
           <div className="flex items-center gap-2">
             <BookOpen className="w-6 h-6 text-blue-600" />
             <h2 className="text-xl font-extrabold text-slate-900 font-serif">
-              {lang === 'ar' ? 'المناهج والمسارات الأكاديمية' : 'Academic Curricula'}
+              {isCoursesDepartment
+                ? (lang === 'ar' ? 'قسم الكورسات والمسارات التدريبية' : 'Courses & Workshops')
+                : (lang === 'ar' ? 'المناهج والمسارات الأكاديمية' : 'Academic Curricula')}
             </h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            إدارة المناهج الأكاديمية والمواد المدرسية (الرياضيات، العلوم، الفيزياء، المواد الأكاديمية).
+            {isCoursesDepartment
+              ? (lang === 'ar' ? 'إدارة الكورسات والدورات والورش التدريبية ودبلومات اللغات والمهارات (خاص بقسم الكورسات).' : 'Manage courses and language tracks.')
+              : (lang === 'ar' ? 'إدارة المناهج الأكاديمية والمواد المدرسية للمراحل التعليمية المختلفة (خاص بقسم المناهج).' : 'Manage school curricula and academic subjects.')}
           </p>
         </div>
 
@@ -167,7 +178,7 @@ export const CoursesModule: React.FC = () => {
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
-            <span>إضافة منهج أكاديمي</span>
+            <span>{isCoursesDepartment ? (lang === 'ar' ? 'إضافة كورس تدريبي' : 'Add Course') : (lang === 'ar' ? 'إضافة منهج أكاديمي' : 'Add Curriculum')}</span>
           </button>
         </div>
       </div>
@@ -177,7 +188,7 @@ export const CoursesModule: React.FC = () => {
           ? 'grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4'
           : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
       }>
-        {academicCourses.map((course) => (
+        {displayedCourses.map((course) => (
           <div key={course.id} className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between relative group hover:border-blue-300 transition-all">
             <div className="space-y-2">
               <div className="flex items-start justify-between gap-1">
@@ -230,7 +241,9 @@ export const CoursesModule: React.FC = () => {
           <form onSubmit={handleSave} className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-extrabold text-slate-900 text-base">
-                {editingCourse ? 'تعديل منهج أكاديمي' : 'إضافة منهج أكاديمي جديد'}
+                {editingCourse
+                  ? (isCoursesDepartment ? 'تعديل الكورس التدريبي' : 'تعديل المنهج الأكاديمي')
+                  : (isCoursesDepartment ? 'إضافة كورس تدريبي جديد' : 'إضافة منهج أكاديمي جديد')}
               </h3>
               <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-800">
                 <X className="w-5 h-5" />
@@ -263,13 +276,15 @@ export const CoursesModule: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">اسم المنهج (عربي)*</label>
+                <label className="block text-slate-700 font-bold mb-1">
+                  {isCoursesDepartment ? 'اسم الكورس / الدورة (عربي)*' : 'اسم المنهج (عربي)*'}
+                </label>
                 <input
                   type="text"
                   required
                   value={titleAr}
                   onChange={(e) => setTitleAr(e.target.value)}
-                  placeholder="مثال: الرياضيات المتقدمة والفيزياء"
+                  placeholder={isCoursesDepartment ? 'مثال: دبلومة البرمجة أو كورس اللغة الإنجليزية' : 'مثال: الرياضيات المتقدمة والفيزياء'}
                   className="w-full border border-slate-200 p-2.5 rounded-xl font-medium"
                 />
               </div>

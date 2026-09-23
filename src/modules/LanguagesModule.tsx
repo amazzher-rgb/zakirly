@@ -166,7 +166,7 @@ export const LanguagesModule: React.FC = () => {
             </p>
           </div>
 
-          {(role === 'super_admin' || role === 'academic_director' || role === 'supervisor' || role === 'supervisor_courses' || role === 'supervisor_curriculum') && (
+          {(role === 'super_admin' || role === 'director_courses' || role === 'director_curriculum' || role === 'supervisor' || role === 'supervisor_courses' || role === 'supervisor_curriculum') && (
             <button
               onClick={handleOpenAdd}
               className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs shadow-lg shadow-amber-500/25 transition-all hover:scale-105"
@@ -274,7 +274,7 @@ export const LanguagesModule: React.FC = () => {
                     {course.status === 'active' ? 'مفعل' : 'غير مفعل'}
                   </span>
 
-                  {(role === 'super_admin' || role === 'academic_director' || role === 'supervisor' || role === 'supervisor_courses' || role === 'supervisor_curriculum') && (
+                  {(role === 'super_admin' || role === 'director_courses' || role === 'director_curriculum' || role === 'supervisor' || role === 'supervisor_courses' || role === 'supervisor_curriculum') && (
                     <div className="flex items-center gap-1 ms-2">
                       <button
                         onClick={() => handleOpenEdit(course)}

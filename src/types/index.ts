@@ -1,14 +1,16 @@
 export type UserRole =
   | 'super_admin'
-  | 'academic_director'
-  | 'administrative_director'
+  | 'director_courses'
+  | 'director_curriculum'
   | 'supervisor'
   | 'supervisor_courses'
   | 'supervisor_curriculum'
   | 'teacher'
   | 'parent'
   | 'student'
-  | 'accountant';
+  | 'accountant'
+  | 'academic_director'
+  | 'administrative_director';
 
 export interface RoleInfo {
   id: UserRole;

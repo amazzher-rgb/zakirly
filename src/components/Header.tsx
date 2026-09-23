@@ -58,9 +58,9 @@ export const Header: React.FC = () => {
   const [passError, setPassError] = useState<string | null>(null);
 
   const availableTenants =
-    role === 'supervisor_courses'
+    role === 'director_courses' || role === 'supervisor_courses'
       ? db.tenants.filter((t) => t.id === 'tenant-zakirly-courses')
-      : role === 'supervisor_curriculum'
+      : role === 'director_curriculum' || role === 'supervisor_curriculum'
       ? db.tenants.filter((t) => t.id === 'tenant-zakirly-curriculum')
       : role === 'supervisor' && currentUser?.tenantId
       ? db.tenants.filter((t) => t.id === currentUser.tenantId)

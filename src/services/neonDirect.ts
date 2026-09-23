@@ -48,8 +48,12 @@ export async function ensureNeonTableExists(): Promise<void> {
       CREATE TABLE IF NOT EXISTS app_state_store (
         key TEXT PRIMARY KEY,
         value JSONB NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        version BIGINT DEFAULT 1 NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+    `;
+    await sql`
+      ALTER TABLE app_state_store ADD COLUMN IF NOT EXISTS version BIGINT DEFAULT 1;
     `;
     hasEnsuredTable = true;
   } catch (err) {
@@ -70,7 +74,7 @@ export async function fetchDirectFromNeon(): Promise<{
   try {
     const sql = getSql();
     const rows = await sql`
-      SELECT key, updated_at::text as updated_at, value
+      SELECT key, updated_at::text as updated_at, version, value
       FROM app_state_store
       WHERE key = 'main_database_state'
       LIMIT 1;
@@ -78,7 +82,8 @@ export async function fetchDirectFromNeon(): Promise<{
 
     if (rows && rows.length > 0 && rows[0].value) {
       const db = rows[0].value as DatabaseState;
-      const ver = Number((db as any)?.dataVersion) || 1;
+      const ver = Number(rows[0].version) || Number((db as any)?.dataVersion) || 1;
+      (db as any).dataVersion = ver;
       return {
         success: true,
         db,
@@ -112,7 +117,7 @@ export async function checkNeonVersion(): Promise<{
   try {
     const sql = getSql();
     const rows = await sql`
-      SELECT updated_at::text as updated_at, COALESCE((value->>'dataVersion')::bigint, 1) as version
+      SELECT updated_at::text as updated_at, version
       FROM app_state_store
       WHERE key = 'main_database_state'
       LIMIT 1;
@@ -150,18 +155,22 @@ export function saveDirectToNeon(db: DatabaseState): Promise<{
       const serialized = JSON.stringify(db);
 
       const res = await sql`
-        INSERT INTO app_state_store (key, value, updated_at)
-        VALUES ('main_database_state', ${serialized}::jsonb, NOW())
+        INSERT INTO app_state_store (key, value, version, updated_at)
+        VALUES ('main_database_state', ${serialized}::jsonb, 1, NOW())
         ON CONFLICT (key) DO UPDATE
-        SET value = EXCLUDED.value, updated_at = NOW()
-        RETURNING updated_at::text as updated_at, (value->>'dataVersion')::bigint as version;
+        SET value = EXCLUDED.value,
+            version = app_state_store.version + 1,
+            updated_at = NOW()
+        RETURNING updated_at::text as updated_at, version;
       `;
 
       const row = res && res[0];
+      const newVersion = row ? Number(row.version) : (Number((db as any)?.dataVersion) || 1) + 1;
+      const newUpdatedAt = row ? String(row.updated_at) : new Date().toISOString();
       return {
         success: true,
-        updatedAt: row ? String(row.updated_at) : new Date().toISOString(),
-        version: row ? Number(row.version) : Number((db as any)?.dataVersion) || 1,
+        updatedAt: newUpdatedAt,
+        version: newVersion,
       };
     } catch (err: any) {
       console.error('[Neon Direct] Save error:', err);

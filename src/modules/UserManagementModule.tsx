@@ -16,27 +16,123 @@ export const UserManagementModule: React.FC = () => {
   const [nameAr, setNameAr] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('123456');
-  const [role, setRole] = useState<UserRole>('administrative_director');
+  const [role, setRole] = useState<UserRole>('director_courses');
   const [showPassword, setShowPassword] = useState(false);
   const [newDirectPassword, setNewDirectPassword] = useState('');
 
   const [msg, setMsg] = useState<string | null>(null);
 
   const permissionsMatrix = [
-    { module: 'لوحة التحكم والتحليلات', super_admin: true, academic_director: true, administrative_director: true, supervisor: true, teacher: true, parent: true, student: true, accountant: true },
-    { module: 'إدارة الطلاب وسجل الحصص', super_admin: true, academic_director: true, administrative_director: true, supervisor: true, teacher: false, parent: true, student: false, accountant: true },
-    { module: 'إدارة المعلمين وهيئة التدريس', super_admin: true, academic_director: true, administrative_director: true, supervisor: true, teacher: false, parent: false, student: false, accountant: true },
-    { module: 'المناهج الدراسية والدورات', super_admin: true, academic_director: true, administrative_director: true, supervisor: true, teacher: true, parent: false, student: false, accountant: false },
-    { module: 'شيت الحصص التجريبية والإشراف', super_admin: true, academic_director: true, administrative_director: true, supervisor: true, teacher: false, parent: false, student: false, accountant: false },
-    { module: 'المالية والفواتير والتحصيل', super_admin: true, academic_director: false, administrative_director: true, supervisor: false, teacher: false, parent: true, student: false, accountant: true },
-    { module: 'مسير رواتب المعلمين', super_admin: true, academic_director: false, administrative_director: false, supervisor: false, teacher: true, parent: false, student: false, accountant: true },
-    { module: 'إدارة الصلاحيات والكلمات المرور', super_admin: true, academic_director: false, administrative_director: false, supervisor: false, teacher: false, parent: false, student: false, accountant: false },
+    {
+      module: 'لوحة التحكم والتحليلات',
+      super_admin: true,
+      director_courses: true,
+      director_curriculum: true,
+      supervisor: true,
+      supervisor_courses: true,
+      supervisor_curriculum: true,
+      teacher: true,
+      parent: true,
+      student: true,
+      accountant: true,
+    },
+    {
+      module: 'إدارة الطلاب وسجل الحصص',
+      super_admin: true,
+      director_courses: true,
+      director_curriculum: true,
+      supervisor: true,
+      supervisor_courses: true,
+      supervisor_curriculum: true,
+      teacher: false,
+      parent: true,
+      student: false,
+      accountant: true,
+    },
+    {
+      module: 'إدارة المعلمين وهيئة التدريس',
+      super_admin: true,
+      director_courses: true,
+      director_curriculum: true,
+      supervisor: true,
+      supervisor_courses: true,
+      supervisor_curriculum: true,
+      teacher: false,
+      parent: false,
+      student: false,
+      accountant: true,
+    },
+    {
+      module: 'المناهج والكورسات التدريبية',
+      super_admin: true,
+      director_courses: true,
+      director_curriculum: true,
+      supervisor: true,
+      supervisor_courses: true,
+      supervisor_curriculum: true,
+      teacher: true,
+      parent: false,
+      student: false,
+      accountant: false,
+    },
+    {
+      module: 'الحصص التجريبية والإشراف',
+      super_admin: true,
+      director_courses: true,
+      director_curriculum: true,
+      supervisor: true,
+      supervisor_courses: true,
+      supervisor_curriculum: true,
+      teacher: false,
+      parent: false,
+      student: false,
+      accountant: false,
+    },
+    {
+      module: 'المالية والفواتير والتحصيل',
+      super_admin: true,
+      director_courses: true,
+      director_curriculum: true,
+      supervisor: false,
+      supervisor_courses: false,
+      supervisor_curriculum: false,
+      teacher: false,
+      parent: true,
+      student: false,
+      accountant: true,
+    },
+    {
+      module: 'مسير رواتب المعلمين',
+      super_admin: true,
+      director_courses: true,
+      director_curriculum: true,
+      supervisor: false,
+      supervisor_courses: false,
+      supervisor_curriculum: false,
+      teacher: true,
+      parent: false,
+      student: false,
+      accountant: true,
+    },
+    {
+      module: 'إدارة الصلاحيات والمستخدمين',
+      super_admin: true,
+      director_courses: false,
+      director_curriculum: false,
+      supervisor: false,
+      supervisor_courses: false,
+      supervisor_curriculum: false,
+      teacher: false,
+      parent: false,
+      student: false,
+      accountant: false,
+    },
   ];
 
   const roles: UserRole[] = [
     'super_admin',
-    'academic_director',
-    'administrative_director',
+    'director_courses',
+    'director_curriculum',
     'supervisor',
     'supervisor_courses',
     'supervisor_curriculum',
@@ -50,6 +146,11 @@ export const UserManagementModule: React.FC = () => {
     e.preventDefault();
     if (!nameAr || !email) return;
 
+    const assignedTenantId =
+      role === 'director_courses' || role === 'supervisor_courses'
+        ? 'tenant-zakirly-courses'
+        : 'tenant-zakirly-curriculum';
+
     if (editingUserId) {
       updateDatabaseState((draft) => {
         const u = draft.users.find((user) => user.id === editingUserId);
@@ -58,6 +159,7 @@ export const UserManagementModule: React.FC = () => {
           u.nameAr = nameAr;
           u.email = email;
           u.role = role;
+          u.tenantId = assignedTenantId;
           if (password) {
             u.password = password;
           }
@@ -67,7 +169,7 @@ export const UserManagementModule: React.FC = () => {
     } else {
       const newUser = {
         id: `usr-${Date.now()}`,
-        tenantId: 'tenant-zakirly-main',
+        tenantId: assignedTenantId,
         name: nameAr,
         nameAr,
         email,
@@ -147,7 +249,7 @@ export const UserManagementModule: React.FC = () => {
             setNameAr('');
             setEmail('');
             setPassword('123456');
-            setRole('administrative_director');
+            setRole('director_courses');
             setIsAddUserOpen(true);
           }}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"

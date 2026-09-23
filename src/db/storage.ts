@@ -23,17 +23,20 @@ export async function loadStateFromSql(): Promise<DatabaseState | null> {
 
 export async function saveStateToSql(state: DatabaseState): Promise<boolean> {
   try {
+    const ver = Number((state as any).dataVersion) || 1;
     await db
       .insert(appStateStore)
       .values({
         key: 'main_database_state',
         value: state,
+        version: ver,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
         target: appStateStore.key,
         set: {
           value: state,
+          version: ver,
           updatedAt: new Date(),
         },
       });

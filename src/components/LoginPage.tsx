@@ -32,6 +32,14 @@ export const LoginPage: React.FC = () => {
     if (newRole === 'super_admin') {
       setEmail('admin@zakirly.edu');
       setPassword('admin123');
+    } else if (newRole === 'director_courses') {
+      setEmail('courses_director@zakirly.edu');
+      setPassword('123456');
+      setActiveTenantId('tenant-zakirly-courses');
+    } else if (newRole === 'director_curriculum') {
+      setEmail('curriculum_director@zakirly.edu');
+      setPassword('123456');
+      setActiveTenantId('tenant-zakirly-curriculum');
     } else if (newRole === 'supervisor_courses') {
       setEmail('courses_supervisor@zakirly.edu');
       setPassword('123456');
@@ -132,7 +140,13 @@ export const LoginPage: React.FC = () => {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-xs font-extrabold text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none cursor-pointer pe-9"
                 >
                   <option value="super_admin" className="bg-slate-900 text-white font-bold">
-                    الدخول كـ مدير نظام (Manager)
+                    الدخول كـ مدير نظام أقصى (Super Admin)
+                  </option>
+                  <option value="director_courses" className="bg-slate-900 text-emerald-400 font-bold">
+                    الدخول كـ مدير قسم الكورسات (Courses Director)
+                  </option>
+                  <option value="director_curriculum" className="bg-slate-900 text-blue-400 font-bold">
+                    الدخول كـ مدير قسم المناهج (Curriculum Director)
                   </option>
                   <option value="supervisor" className="bg-slate-900 text-white font-bold">
                     الدخول كـ مشرف عام (Supervisor)
@@ -156,9 +170,21 @@ export const LoginPage: React.FC = () => {
               </label>
               <div className="relative">
                 <select
-                  value={activeTenantId}
+                  value={
+                    selectedRole === 'director_courses' || selectedRole === 'supervisor_courses'
+                      ? 'tenant-zakirly-courses'
+                      : selectedRole === 'director_curriculum' || selectedRole === 'supervisor_curriculum'
+                      ? 'tenant-zakirly-curriculum'
+                      : activeTenantId
+                  }
                   onChange={(e) => setActiveTenantId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none cursor-pointer pe-9"
+                  disabled={
+                    selectedRole === 'director_courses' ||
+                    selectedRole === 'supervisor_courses' ||
+                    selectedRole === 'director_curriculum' ||
+                    selectedRole === 'supervisor_curriculum'
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none cursor-pointer pe-9 disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                   {db.tenants.map((t) => (
                     <option key={t.id} value={t.id}>

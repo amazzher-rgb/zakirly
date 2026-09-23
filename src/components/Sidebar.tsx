@@ -55,9 +55,9 @@ export const Sidebar: React.FC = () => {
   } = useApp();
 
   const availableTenants =
-    role === 'supervisor_courses'
+    role === 'director_courses' || role === 'supervisor_courses'
       ? db.tenants.filter((t) => t.id === 'tenant-zakirly-courses')
-      : role === 'supervisor_curriculum'
+      : role === 'director_curriculum' || role === 'supervisor_curriculum'
       ? db.tenants.filter((t) => t.id === 'tenant-zakirly-curriculum')
       : role === 'supervisor' && currentUser?.tenantId
       ? db.tenants.filter((t) => t.id === currentUser.tenantId)
@@ -78,8 +78,8 @@ export const Sidebar: React.FC = () => {
       icon: LayoutDashboard,
       allowedRoles: [
         'super_admin',
-        'academic_director',
-        'administrative_director',
+        'director_courses',
+        'director_curriculum',
         'teacher',
         'parent',
         'student',
@@ -93,7 +93,16 @@ export const Sidebar: React.FC = () => {
       icon: GraduationCap,
       badge: kpis.totalStudents,
       badgeColor: 'bg-blue-100 text-blue-800',
-      allowedRoles: ['super_admin', 'academic_director', 'administrative_director', 'supervisor', 'supervisor_courses', 'supervisor_curriculum', 'parent', 'accountant'],
+      allowedRoles: [
+        'super_admin',
+        'director_courses',
+        'director_curriculum',
+        'supervisor',
+        'supervisor_courses',
+        'supervisor_curriculum',
+        'parent',
+        'accountant',
+      ],
     },
     {
       id: 'teachers',
@@ -102,7 +111,15 @@ export const Sidebar: React.FC = () => {
       icon: Users,
       badge: db.teachers.length,
       badgeColor: 'bg-emerald-100 text-emerald-800',
-      allowedRoles: ['super_admin', 'academic_director', 'administrative_director', 'supervisor', 'supervisor_courses', 'supervisor_curriculum', 'accountant'],
+      allowedRoles: [
+        'super_admin',
+        'director_courses',
+        'director_curriculum',
+        'supervisor',
+        'supervisor_courses',
+        'supervisor_curriculum',
+        'accountant',
+      ],
     },
     {
       id: 'parents',
@@ -110,14 +127,22 @@ export const Sidebar: React.FC = () => {
       titleEn: 'Parents Portal',
       icon: UserCheck,
       badge: db.parents.length,
-      allowedRoles: ['super_admin', 'administrative_director', 'accountant'],
+      allowedRoles: ['super_admin', 'director_courses', 'director_curriculum', 'accountant'],
     },
     {
       id: 'courses',
-      titleAr: 'المناهج الدراسية',
-      titleEn: 'Academic Curricula',
+      titleAr: activeTenantId === 'tenant-zakirly-courses' ? 'الكورسات والدورات' : 'المناهج الدراسية',
+      titleEn: activeTenantId === 'tenant-zakirly-courses' ? 'Courses & Workshops' : 'Academic Curricula',
       icon: BookOpen,
-      allowedRoles: ['super_admin', 'academic_director', 'teacher', 'administrative_director', 'supervisor', 'supervisor_courses', 'supervisor_curriculum'],
+      allowedRoles: [
+        'super_admin',
+        'director_courses',
+        'director_curriculum',
+        'teacher',
+        'supervisor',
+        'supervisor_courses',
+        'supervisor_curriculum',
+      ],
     },
     {
       id: 'scheduling',
@@ -128,8 +153,8 @@ export const Sidebar: React.FC = () => {
       badgeColor: 'bg-amber-100 text-amber-800',
       allowedRoles: [
         'super_admin',
-        'academic_director',
-        'administrative_director',
+        'director_courses',
+        'director_curriculum',
         'supervisor',
         'supervisor_courses',
         'supervisor_curriculum',
@@ -143,7 +168,16 @@ export const Sidebar: React.FC = () => {
       titleAr: 'سجل الحضور والغياب',
       titleEn: 'Attendance Log',
       icon: CheckCircle2,
-      allowedRoles: ['super_admin', 'academic_director', 'supervisor', 'supervisor_courses', 'supervisor_curriculum', 'teacher', 'parent'],
+      allowedRoles: [
+        'super_admin',
+        'director_courses',
+        'director_curriculum',
+        'supervisor',
+        'supervisor_courses',
+        'supervisor_curriculum',
+        'teacher',
+        'parent',
+      ],
     },
     {
       id: 'finance',
@@ -152,14 +186,14 @@ export const Sidebar: React.FC = () => {
       icon: Receipt,
       badge: kpis.outstandingPayments > 0 ? 'مستحقات' : undefined,
       badgeColor: 'bg-rose-100 text-rose-800',
-      allowedRoles: ['super_admin', 'administrative_director', 'accountant', 'parent'],
+      allowedRoles: ['super_admin', 'director_courses', 'director_curriculum', 'accountant', 'parent'],
     },
     {
       id: 'payroll',
       titleAr: 'مسير رواتب المعلمين',
       titleEn: 'Teacher Payroll',
       icon: Banknote,
-      allowedRoles: ['super_admin', 'accountant', 'teacher'],
+      allowedRoles: ['super_admin', 'director_courses', 'director_curriculum', 'accountant', 'teacher'],
     },
     {
       id: 'subscriptions',
@@ -168,7 +202,14 @@ export const Sidebar: React.FC = () => {
       badge: pendingRenewals > 0 ? `${pendingRenewals} تنبيه` : undefined,
       badgeColor: 'bg-amber-100 text-amber-900 font-bold',
       icon: Repeat,
-      allowedRoles: ['super_admin', 'academic_director', 'administrative_director', 'supervisor', 'supervisor_courses', 'supervisor_curriculum'],
+      allowedRoles: [
+        'super_admin',
+        'director_courses',
+        'director_curriculum',
+        'supervisor',
+        'supervisor_courses',
+        'supervisor_curriculum',
+      ],
     },
     {
       id: 'trial_lessons',
@@ -177,14 +218,21 @@ export const Sidebar: React.FC = () => {
       icon: Sparkles,
       badge: pendingTrials > 0 ? pendingTrials : undefined,
       badgeColor: 'bg-purple-100 text-purple-800',
-      allowedRoles: ['super_admin', 'academic_director', 'administrative_director', 'supervisor', 'supervisor_courses', 'supervisor_curriculum'],
+      allowedRoles: [
+        'super_admin',
+        'director_courses',
+        'director_curriculum',
+        'supervisor',
+        'supervisor_courses',
+        'supervisor_curriculum',
+      ],
     },
     {
       id: 'reports',
       titleAr: 'التقارير والتحليلات',
       titleEn: 'Reports & Analytics',
       icon: BarChart3,
-      allowedRoles: ['super_admin', 'academic_director', 'administrative_director', 'accountant'],
+      allowedRoles: ['super_admin', 'director_courses', 'director_curriculum', 'accountant'],
     },
     {
       id: 'user_management',
@@ -198,7 +246,7 @@ export const Sidebar: React.FC = () => {
       titleAr: 'سجل العمليات والأمان',
       titleEn: 'Audit Trail',
       icon: History,
-      allowedRoles: ['super_admin', 'administrative_director', 'accountant'],
+      allowedRoles: ['super_admin', 'director_courses', 'director_curriculum', 'accountant'],
     },
     {
       id: 'settings',
@@ -209,7 +257,12 @@ export const Sidebar: React.FC = () => {
     },
   ];
 
-  const visibleItems = menuItems.filter((item) => item.allowedRoles.includes(role));
+  const visibleItems = menuItems.filter((item) => {
+    if (item.allowedRoles.includes(role)) return true;
+    if ((role as any) === 'academic_director' && item.allowedRoles.includes('director_curriculum')) return true;
+    if ((role as any) === 'administrative_director' && item.allowedRoles.includes('director_courses')) return true;
+    return false;
+  });
 
   const handleSelectModule = (id: string) => {
     setActiveModule(id);

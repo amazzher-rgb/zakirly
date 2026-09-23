@@ -54,22 +54,38 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleInfo> = {
     badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
     badgeTextColor: 'text-purple-700',
   },
-  academic_director: {
-    id: 'academic_director',
-    titleAr: 'المدير الأكاديمي (Academic Director)',
-    titleEn: 'Academic Director',
-    descriptionAr: 'إدارة المناهج، المواد الدراسية، تقييم المعلمين، الجداول، والحصص التجريبية.',
-    badgeBg: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-    badgeTextColor: 'text-indigo-700',
+  director_courses: {
+    id: 'director_courses',
+    titleAr: 'مدير قسم الكورسات (Courses Director)',
+    titleEn: 'Courses Director',
+    descriptionAr: 'إدارة كاملة لقسم الكورسات والدورات التدريبية فقط (الطلاب، المعلمين، الكورسات، الحصص، الاشتراكات والمالية)، ولا يمكنه الوصول لقسم المناهج.',
+    badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    badgeTextColor: 'text-emerald-700',
   },
-  administrative_director: {
-    id: 'administrative_director',
-    titleAr: 'المدير الإداري (Administrative Director)',
-    titleEn: 'Administrative Director',
-    descriptionAr: 'متابعة اشتراكات الطلاب، التجديدات، التواصل مع أولياء الأمور، وجدول المواعيد.',
+  director_curriculum: {
+    id: 'director_curriculum',
+    titleAr: 'مدير قسم المناهج (Curriculum Director)',
+    titleEn: 'Curriculum Director',
+    descriptionAr: 'إدارة كاملة لقسم المناهج الدراسية والأكاديمية فقط (الطلاب، المعلمين، المواد الدراسية، الحصص، الاشتراكات والمالية)، ولا يمكنه الوصول لقسم الكورسات.',
     badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
     badgeTextColor: 'text-blue-700',
   },
+  academic_director: {
+    id: 'director_curriculum',
+    titleAr: 'مدير قسم المناهج (Curriculum Director)',
+    titleEn: 'Curriculum Director',
+    descriptionAr: 'تم التحديث إلى: مدير قسم المناهج',
+    badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
+    badgeTextColor: 'text-blue-700',
+  } as any,
+  administrative_director: {
+    id: 'director_courses',
+    titleAr: 'مدير قسم الكورسات (Courses Director)',
+    titleEn: 'Courses Director',
+    descriptionAr: 'تم التحديث إلى: مدير قسم الكورسات',
+    badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    badgeTextColor: 'text-emerald-700',
+  } as any,
   supervisor: {
     id: 'supervisor',
     titleAr: 'المشرف التعليمي (Supervisor)',
@@ -224,6 +240,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [role, setRole] = useState<UserRole>(() => {
     try {
       const savedRole = localStorage.getItem('zakirly_role_v2');
+      if (savedRole === 'academic_director') return 'director_curriculum';
+      if (savedRole === 'administrative_director') return 'director_courses';
       return (savedRole as UserRole) || 'super_admin';
     } catch {
       return 'super_admin';
@@ -231,7 +249,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
-  const [activeTenantId, setActiveTenantId] = useState<string>('tenant-zakirly-curriculum');
+  const [activeTenantId, setActiveTenantId] = useState<string>(() => {
+    try {
+      const savedRole = localStorage.getItem('zakirly_role_v2');
+      if (savedRole === 'director_courses' || savedRole === 'supervisor_courses' || savedRole === 'administrative_director') {
+        return 'tenant-zakirly-courses';
+      }
+    } catch {}
+    return 'tenant-zakirly-curriculum';
+  });
 
   // Save auth state changes to localStorage
   useEffect(() => {
@@ -251,15 +277,45 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [isAuthenticated, currentUser, role]);
 
   // Lock tenant branch based on role restrictions:
-  // supervisor_courses -> strictly tenant-zakirly-courses
-  // supervisor_curriculum -> strictly tenant-zakirly-curriculum
+  // director_courses & supervisor_courses -> strictly tenant-zakirly-courses
+  // director_curriculum & supervisor_curriculum -> strictly tenant-zakirly-curriculum
   useEffect(() => {
-    if (role === 'supervisor_courses' && activeTenantId !== 'tenant-zakirly-courses') {
+    if (
+      (role === 'director_courses' || role === 'supervisor_courses') &&
+      activeTenantId !== 'tenant-zakirly-courses'
+    ) {
       setActiveTenantId('tenant-zakirly-courses');
-    } else if (role === 'supervisor_curriculum' && activeTenantId !== 'tenant-zakirly-curriculum') {
+    } else if (
+      (role === 'director_curriculum' || role === 'supervisor_curriculum') &&
+      activeTenantId !== 'tenant-zakirly-curriculum'
+    ) {
       setActiveTenantId('tenant-zakirly-curriculum');
     }
   }, [role, activeTenantId]);
+
+  const handleSetActiveTenantId = (newTenantId: string) => {
+    if (role === 'director_courses' || role === 'supervisor_courses') {
+      setActiveTenantId('tenant-zakirly-courses');
+      return;
+    }
+    if (role === 'director_curriculum' || role === 'supervisor_curriculum') {
+      setActiveTenantId('tenant-zakirly-curriculum');
+      return;
+    }
+    setActiveTenantId(newTenantId);
+  };
+
+  const handleSetRole = (newRole: UserRole) => {
+    let effectiveRole = newRole;
+    if ((newRole as any) === 'academic_director') effectiveRole = 'director_curriculum';
+    if ((newRole as any) === 'administrative_director') effectiveRole = 'director_courses';
+    setRole(effectiveRole);
+    if (effectiveRole === 'director_courses' || effectiveRole === 'supervisor_courses') {
+      setActiveTenantId('tenant-zakirly-courses');
+    } else if (effectiveRole === 'director_curriculum' || effectiveRole === 'supervisor_curriculum') {
+      setActiveTenantId('tenant-zakirly-curriculum');
+    }
+  };
 
   const [db, setDb] = useState<DatabaseState>(() => {
     return loadPermanentState();
@@ -405,21 +461,101 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Check predefined accounts fallback
       const isPredefinedAdmin = trimmedEmail === 'admin@zakirly.edu' || trimmedEmail === 'superadmin@zakirly.academy';
       const isPredefinedSupervisor = trimmedEmail === 'supervisor@zakirly.edu' || trimmedEmail === 'supervisor@zakirly.academy';
+      const isPredefinedCoursesDirector = trimmedEmail === 'courses_director@zakirly.edu' || trimmedEmail === 'admin@zakirly.academy';
+      const isPredefinedCurriculumDirector = trimmedEmail === 'curriculum_director@zakirly.edu' || trimmedEmail === 'academic@zakirly.academy';
+      const isPredefinedCoursesSupervisor = trimmedEmail === 'courses_supervisor@zakirly.edu';
+      const isPredefinedCurriculumSupervisor = trimmedEmail === 'curriculum_supervisor@zakirly.edu';
 
-      if (isPredefinedAdmin && trimmedPassword === 'admin123') {
+      if (isPredefinedAdmin && (trimmedPassword === 'admin123' || trimmedPassword === '123456')) {
         const targetRole = selectedRole || 'super_admin';
         const userObj: User = {
           id: 'usr-admin-edu',
           tenantId: activeTenantId,
-          name: 'مدير أكاديمية ذاكرلي',
+          name: 'مدير أكاديمية ذاكرلي الأقصى',
           email: trimmedEmail,
           role: targetRole,
           status: 'active',
           lastLogin: new Date().toISOString(),
         };
         setCurrentUser(userObj);
-        setRole(targetRole);
+        handleSetRole(targetRole);
         setActiveModule('dashboard');
+        setIsAuthenticated(true);
+        return true;
+      }
+
+      if (isPredefinedCoursesDirector && (trimmedPassword === '123456' || trimmedPassword === 'admin123')) {
+        const userObj: User = {
+          id: 'usr-dir-courses',
+          tenantId: 'tenant-zakirly-courses',
+          name: 'مدير قسم الكورسات والدورات',
+          nameAr: 'مدير قسم الكورسات والدورات',
+          email: trimmedEmail,
+          role: 'director_courses',
+          status: 'active',
+          lastLogin: new Date().toISOString(),
+        };
+        setCurrentUser(userObj);
+        handleSetRole('director_courses');
+        handleSetActiveTenantId('tenant-zakirly-courses');
+        setActiveModule('dashboard');
+        setIsAuthenticated(true);
+        return true;
+      }
+
+      if (isPredefinedCurriculumDirector && (trimmedPassword === '123456' || trimmedPassword === 'admin123')) {
+        const userObj: User = {
+          id: 'usr-dir-curriculum',
+          tenantId: 'tenant-zakirly-curriculum',
+          name: 'مدير قسم المناهج الدراسية',
+          nameAr: 'مدير قسم المناهج الدراسية',
+          email: trimmedEmail,
+          role: 'director_curriculum',
+          status: 'active',
+          lastLogin: new Date().toISOString(),
+        };
+        setCurrentUser(userObj);
+        handleSetRole('director_curriculum');
+        handleSetActiveTenantId('tenant-zakirly-curriculum');
+        setActiveModule('dashboard');
+        setIsAuthenticated(true);
+        return true;
+      }
+
+      if (isPredefinedCoursesSupervisor && (trimmedPassword === '123456' || trimmedPassword === 'supervisor123')) {
+        const userObj: User = {
+          id: 'usr-sup-courses',
+          tenantId: 'tenant-zakirly-courses',
+          name: 'مشرف قسم الكورسات',
+          nameAr: 'مشرف قسم الكورسات',
+          email: trimmedEmail,
+          role: 'supervisor_courses',
+          status: 'active',
+          lastLogin: new Date().toISOString(),
+        };
+        setCurrentUser(userObj);
+        handleSetRole('supervisor_courses');
+        handleSetActiveTenantId('tenant-zakirly-courses');
+        setActiveModule('students');
+        setIsAuthenticated(true);
+        return true;
+      }
+
+      if (isPredefinedCurriculumSupervisor && (trimmedPassword === '123456' || trimmedPassword === 'supervisor123')) {
+        const userObj: User = {
+          id: 'usr-sup-curriculum',
+          tenantId: 'tenant-zakirly-curriculum',
+          name: 'مشرف قسم المناهج',
+          nameAr: 'مشرف قسم المناهج',
+          email: trimmedEmail,
+          role: 'supervisor_curriculum',
+          status: 'active',
+          lastLogin: new Date().toISOString(),
+        };
+        setCurrentUser(userObj);
+        handleSetRole('supervisor_curriculum');
+        handleSetActiveTenantId('tenant-zakirly-curriculum');
+        setActiveModule('students');
         setIsAuthenticated(true);
         return true;
       }
@@ -436,7 +572,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           lastLogin: new Date().toISOString(),
         };
         setCurrentUser(userObj);
-        setRole(targetRole);
+        handleSetRole(targetRole);
         setActiveModule('students');
         setIsAuthenticated(true);
         return true;
@@ -453,16 +589,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return false;
     }
 
-    const targetRole = selectedRole || matchingUser.role;
+    let targetRole = selectedRole || matchingUser.role;
+    if ((targetRole as any) === 'academic_director') targetRole = 'director_curriculum';
+    if ((targetRole as any) === 'administrative_director') targetRole = 'director_courses';
+
+    let userTenantId = matchingUser.tenantId || activeTenantId;
+    if (targetRole === 'director_courses' || targetRole === 'supervisor_courses') {
+      userTenantId = 'tenant-zakirly-courses';
+      handleSetActiveTenantId('tenant-zakirly-courses');
+    } else if (targetRole === 'director_curriculum' || targetRole === 'supervisor_curriculum') {
+      userTenantId = 'tenant-zakirly-curriculum';
+      handleSetActiveTenantId('tenant-zakirly-curriculum');
+    }
+
     const updatedUser: User = {
       ...matchingUser,
-      tenantId: activeTenantId || matchingUser.tenantId,
+      tenantId: userTenantId,
       role: targetRole,
       lastLogin: new Date().toISOString(),
     };
 
     setCurrentUser(updatedUser);
-    setRole(targetRole);
+    handleSetRole(targetRole);
 
     if (targetRole === 'supervisor') {
       setActiveModule('students');
@@ -600,6 +748,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
           if (r.version) {
             currentVersionRef.current = Math.max(currentVersionRef.current, r.version);
+            (nextDb as any).dataVersion = r.version;
+            savePermanentState(nextDb);
           }
         }
       }).catch((err) => {
@@ -644,7 +794,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const neonRes = await fetchDirectFromNeon();
       if (neonRes.success && neonRes.db && Array.isArray(neonRes.db.students) && Array.isArray(neonRes.db.teachers)) {
         activeDb = neonRes.db;
-        activeVer = Number((activeDb as any)?.dataVersion) || neonRes.version || 1;
+        activeVer = Number(neonRes.version) || Number((activeDb as any)?.dataVersion) || 1;
         if (neonRes.updatedAt) {
           lastSyncedUpdatedAtRef.current = neonRes.updatedAt;
         }
@@ -654,31 +804,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const data = await fetchState();
           if (data && data.db && Array.isArray(data.db.students) && Array.isArray(data.db.teachers)) {
             activeDb = data.db;
-            activeVer = Number((activeDb as any)?.dataVersion) || data.version || 1;
+            activeVer = Number(data.version) || Number((activeDb as any)?.dataVersion) || 1;
+            if (data.lastSavedAt) {
+              lastSyncedUpdatedAtRef.current = data.lastSavedAt;
+            }
           }
         } catch {}
       }
 
       if (activeDb) {
-        // Check if server is empty but client has modifications
-        const isCloudVirgin = (!activeVer || activeVer <= 1) && !hasUserModifications(activeDb);
-        const clientHasRealMods = hasUserModifications(effectiveClientDb);
-
-        if (isCloudVirgin && clientHasRealMods) {
-          console.info('[Zakirly] Seeding cloud database from local client data');
-          setDb(effectiveClientDb);
-          setKpis(computeLocalKPIs(effectiveClientDb));
-          savePermanentState(effectiveClientDb);
-          saveDirectToNeon(effectiveClientDb).catch(() => {});
-          syncStateApi(effectiveClientDb, 'مزامنة أولية لقاعدة البيانات السحابية').catch(() => {});
-        } else {
-          // Cloud database is the single authoritative source of truth across all devices!
-          setDb(activeDb);
-          setKpis(computeLocalKPIs(activeDb));
-          savePermanentState(activeDb);
-          if (activeVer > 0) {
-            currentVersionRef.current = Math.max(currentVersionRef.current, activeVer);
-          }
+        // Cloud database is the single authoritative source of truth across all devices!
+        setDb(activeDb);
+        setKpis(computeLocalKPIs(activeDb));
+        savePermanentState(activeDb);
+        if (activeVer > 0) {
+          currentVersionRef.current = Math.max(currentVersionRef.current, activeVer);
         }
         setIsRealtimeConnected(true);
       } else {
@@ -747,6 +887,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // 4. Ultra-fast multi-device polling: checks Neon version directly every 1.5 seconds
     const pollInterval = setInterval(async () => {
       try {
+        if (isSyncingRef.current) return;
         // Check direct Neon version (ultra-lightweight scalar query)
         const neonVer = await checkNeonVersion();
         if (neonVer.success) {
@@ -758,7 +899,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           );
 
           if (hasNewerVersion || hasNewerTimestamp) {
-            console.info(`[Zakirly] Neon cloud change detected (ver: ${neonVer.version}, updated: ${neonVer.updatedAt}), syncing...`);
+            console.info(`[Zakirly] Neon cloud change detected (ver: ${neonVer.version}, current: ${currentVersionRef.current}), syncing...`);
             reloadData();
             return;
           }
@@ -837,6 +978,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setDb(res.db);
         if (res.kpis) setKpis(res.kpis);
         savePermanentState(res.db);
+        saveDirectToNeon(res.db).catch(() => {});
         return res;
       }
     } catch (e) {}
@@ -899,6 +1041,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setDb(res.db);
         if (res.kpis) setKpis(res.kpis);
         savePermanentState(res.db);
+        saveDirectToNeon(res.db).catch(() => {});
         // Find updated invoice from new DB if res.invoice is missing
         const updatedInvoice = res.invoice || res.db.invoices?.find((i: any) => i.id === invoiceId);
         return { ...res, invoice: updatedInvoice };
@@ -958,6 +1101,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setDb(res.db);
         if (res.kpis) setKpis(res.kpis);
         savePermanentState(res.db);
+        saveDirectToNeon(res.db).catch(() => {});
         return res;
       }
     } catch (err) {
@@ -1391,6 +1535,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setDb(resData.db);
         setKpis(resData.kpis || computeLocalKPIs(resData.db));
         savePermanentState(resData.db);
+        saveDirectToNeon(resData.db).catch(() => {});
       }
     } catch (err) {
       console.warn('API error, executing client fallback for student creation', err);
@@ -1494,6 +1639,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setDb(res.db);
         setKpis(res.kpis || computeLocalKPIs(res.db));
         savePermanentState(res.db);
+        saveDirectToNeon(res.db).catch(() => {});
         createdTeacherObj = res.teacher || (res.db.teachers && res.db.teachers[0]);
       }
     } catch (err) {
@@ -1645,9 +1791,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     rawArray: T[],
     tenantId: string
   ): T[] => {
-    const filtered = (rawArray || []).filter(
-      (item) => !item.tenantId || item.tenantId === tenantId || item.tenantId === 'tenant-zakirly-main'
-    );
+    const filtered = (rawArray || []).filter((item) => {
+      if (!item) return false;
+      if (tenantId === 'tenant-zakirly-courses') {
+        return item.tenantId === 'tenant-zakirly-courses';
+      }
+      return (
+        item.tenantId === 'tenant-zakirly-curriculum' ||
+        item.tenantId === 'tenant-zakirly-main' ||
+        !item.tenantId
+      );
+    });
 
     return new Proxy(filtered, {
       get(target, prop, receiver) {
@@ -1727,11 +1881,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         login,
         logout,
         role,
-        setRole,
+        setRole: handleSetRole,
         lang,
         setLang,
         activeTenantId,
-        setActiveTenantId,
+        setActiveTenantId: handleSetActiveTenantId,
         currency,
         currencySymbol,
         setCurrency,

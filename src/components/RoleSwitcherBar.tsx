@@ -16,8 +16,8 @@ export const RoleSwitcherBar: React.FC = () => {
 
   const rolesList: UserRole[] = [
     'super_admin',
-    'academic_director',
-    'administrative_director',
+    'director_courses',
+    'director_curriculum',
     'supervisor',
     'supervisor_courses',
     'supervisor_curriculum',
