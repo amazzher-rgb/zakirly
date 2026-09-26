@@ -68,7 +68,16 @@ export const Sidebar: React.FC = () => {
   const currentTenant = availableTenants.find((t) => t.id === activeTenantId) || availableTenants[0] || db.tenants[0];
 
   const pendingRenewals = db.subscriptions.filter((s) => s.remainingSessions <= 2).length;
-  const pendingTrials = db.trialLessons.filter((t) => t.status === 'scheduled').length;
+  const isCoursesDept = activeTenantId === 'tenant-zakirly-courses' || role === 'director_courses' || role === 'supervisor_courses';
+  const pendingTrials = (db.trialLessons || []).filter((t) => {
+    if (t.status !== 'scheduled') return false;
+    if (role === 'super_admin' && activeTenantId !== 'tenant-zakirly-courses' && activeTenantId !== 'tenant-zakirly-curriculum') return true;
+    if (isCoursesDept) {
+      return t.tenantId === 'tenant-zakirly-courses' || t.courseTitleAr?.includes('كورس') || t.courseTitleAr?.includes('دبلومة') || t.courseTitleAr?.includes('فرنسية') || t.courseTitleAr?.includes('ألمانية');
+    } else {
+      return t.tenantId === 'tenant-zakirly-curriculum' || (!t.courseTitleAr?.includes('كورس') && !t.courseTitleAr?.includes('دبلومة') && !t.courseTitleAr?.includes('فرنسية') && !t.courseTitleAr?.includes('ألمانية'));
+    }
+  }).length;
 
   const menuItems: MenuItem[] = [
     {
@@ -221,11 +230,11 @@ export const Sidebar: React.FC = () => {
     },
     {
       id: 'trial_lessons',
-      titleAr: 'الحصص التجريبية',
+      titleAr: activeTenantId === 'tenant-zakirly-courses' ? 'الحصص التجريبية (الكورسات)' : activeTenantId === 'tenant-zakirly-curriculum' ? 'الحصص التجريبية (المناهج)' : 'الحصص التجريبية',
       titleEn: 'Trial Lessons Funnel',
       icon: Sparkles,
       badge: pendingTrials > 0 ? pendingTrials : undefined,
-      badgeColor: 'bg-purple-100 text-purple-800',
+      badgeColor: isCoursesDept ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800',
       allowedRoles: [
         'super_admin',
         'director_courses',

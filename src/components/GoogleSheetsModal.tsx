@@ -140,9 +140,10 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({ isOpen, on
       ]);
     } else if (selectedEntity === 'trialLessons') {
       title = 'شيت الحصص التجريبية والتحويلات - أكاديمية ذاكرلي';
-      headers = ['كود الطلب', 'اسم الطالب', 'اسم ولي الأمر', 'هاتف ولي الأمر', 'المادة / الدورة', 'المعلم المعين', 'تاريخ الحصة', 'الموعد', 'الحالة', 'تاريخ الطلب'];
+      headers = ['كود الطلب', 'القسم الأكاديمي', 'اسم الطالب', 'اسم ولي الأمر', 'هاتف ولي الأمر', 'المادة / الدورة', 'المعلم المعين', 'تاريخ الحصة', 'الموعد', 'الحالة', 'تاريخ الطلب'];
       rows = (db.trialLessons || []).map((t) => [
         t.id,
+        t.tenantId === 'tenant-zakirly-courses' ? 'قسم الكورسات والتدريب' : 'قسم المناهج الدراسية',
         t.studentNameAr,
         t.parentNameAr,
         t.parentPhone,
