@@ -193,14 +193,36 @@ export const UserManagementModule: React.FC = () => {
     e.preventDefault();
     if (!changePasswordUserId || !newDirectPassword) return;
 
+    const trimmedNewPass = newDirectPassword.trim();
+    const targetUser = db.users.find((user) => user.id === changePasswordUserId);
+
     updateDatabaseState((draft) => {
       const u = draft.users.find((user) => user.id === changePasswordUserId);
       if (u) {
-        u.password = newDirectPassword;
+        u.password = trimmedNewPass;
+        // If super admin, sync all admin aliases
+        if (u.role === 'super_admin' || u.email === 'admin@zakirly.edu' || u.email === 'superadmin@zakirly.academy') {
+          draft.users.forEach((other) => {
+            if (other.role === 'super_admin' || other.email === 'admin@zakirly.edu' || other.email === 'superadmin@zakirly.academy') {
+              other.password = trimmedNewPass;
+            }
+          });
+        }
       }
     });
-    const targetUser = db.users.find((user) => user.id === changePasswordUserId);
-    setMsg(`تم تغيير كلمة المرور للمستخدم (${targetUser?.nameAr || targetUser?.name || ''}) إلى: (${newDirectPassword}) بنجاح.`);
+
+    try {
+      const remembered = localStorage.getItem('zakirly_remembered_credentials');
+      if (remembered && targetUser?.email) {
+        const parsed = JSON.parse(remembered);
+        if (parsed.email && parsed.email.toLowerCase() === targetUser.email.toLowerCase()) {
+          parsed.password = trimmedNewPass;
+          localStorage.setItem('zakirly_remembered_credentials', JSON.stringify(parsed));
+        }
+      }
+    } catch {}
+
+    setMsg(`تم تغيير كلمة المرور للمستخدم (${targetUser?.nameAr || targetUser?.name || ''}) إلى: (${trimmedNewPass}) بنجاح.`);
     setTimeout(() => setMsg(null), 5000);
 
     setChangePasswordUserId(null);

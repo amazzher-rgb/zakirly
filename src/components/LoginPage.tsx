@@ -19,9 +19,35 @@ import {
 export const LoginPage: React.FC = () => {
   const { login, db, activeTenantId, setActiveTenantId, lang, setLang } = useApp();
 
+  const getAccountPassword = (targetEmail: string, role: UserRole): string => {
+    try {
+      const remembered = localStorage.getItem('zakirly_remembered_credentials');
+      if (remembered) {
+        const parsed = JSON.parse(remembered);
+        if (parsed.email && parsed.email.toLowerCase() === targetEmail.toLowerCase() && parsed.password) {
+          return parsed.password;
+        }
+      }
+    } catch {}
+
+    const u = db.users.find(
+      (user) =>
+        user.email.toLowerCase() === targetEmail.toLowerCase() ||
+        (role === 'super_admin' &&
+          (user.role === 'super_admin' ||
+            user.email.toLowerCase() === 'admin@zakirly.edu' ||
+            user.email.toLowerCase() === 'superadmin@zakirly.academy')) ||
+        user.role === role
+    );
+    if (u?.password) return u.password;
+    if (role === 'super_admin') return 'admin123';
+    if (role === 'supervisor') return 'supervisor123';
+    return '123456';
+  };
+
   const [selectedRole, setSelectedRole] = useState<UserRole>('super_admin');
   const [email, setEmail] = useState('admin@zakirly.edu');
-  const [password, setPassword] = useState('admin123');
+  const [password, setPassword] = useState(() => getAccountPassword('admin@zakirly.edu', 'super_admin'));
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -29,29 +55,26 @@ export const LoginPage: React.FC = () => {
 
   const handleRoleChange = (newRole: UserRole) => {
     setSelectedRole(newRole);
+    let targetEmail = 'supervisor@zakirly.edu';
     if (newRole === 'super_admin') {
-      setEmail('admin@zakirly.edu');
-      setPassword('admin123');
+      targetEmail = 'admin@zakirly.edu';
     } else if (newRole === 'director_courses') {
-      setEmail('courses_director@zakirly.edu');
-      setPassword('123456');
+      targetEmail = 'courses_director@zakirly.edu';
       setActiveTenantId('tenant-zakirly-courses');
     } else if (newRole === 'director_curriculum') {
-      setEmail('curriculum_director@zakirly.edu');
-      setPassword('123456');
+      targetEmail = 'curriculum_director@zakirly.edu';
       setActiveTenantId('tenant-zakirly-curriculum');
     } else if (newRole === 'supervisor_courses') {
-      setEmail('courses_supervisor@zakirly.edu');
-      setPassword('123456');
+      targetEmail = 'courses_supervisor@zakirly.edu';
       setActiveTenantId('tenant-zakirly-courses');
     } else if (newRole === 'supervisor_curriculum') {
-      setEmail('curriculum_supervisor@zakirly.edu');
-      setPassword('123456');
+      targetEmail = 'curriculum_supervisor@zakirly.edu';
       setActiveTenantId('tenant-zakirly-curriculum');
     } else {
-      setEmail('supervisor@zakirly.edu');
-      setPassword('supervisor123');
+      targetEmail = 'supervisor@zakirly.edu';
     }
+    setEmail(targetEmail);
+    setPassword(getAccountPassword(targetEmail, newRole));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -73,14 +96,20 @@ export const LoginPage: React.FC = () => {
     setTimeout(() => {
       const success = login(email, password, selectedRole);
       setIsLoading(false);
-      if (!success) {
+      if (success) {
+        if (rememberMe) {
+          try {
+            localStorage.setItem('zakirly_remembered_credentials', JSON.stringify({ email, password }));
+          } catch {}
+        }
+      } else {
         setErrorMessage(
           lang === 'ar'
-            ? 'خطأ في تسجيل الدخول: البريد الإلكتروني أو كلمة المرور غير صحيحة. يرجى كتابة كلمة المرور الصحيحة.'
+            ? 'خطأ في تسجيل الدخول: البريد الإلكتروني أو كلمة المرور غير صحيحة. يرجى كتابة كلمة المرور الصحيحة بعد التحديث.'
             : 'Login failed: Invalid email or password. Please check your password.'
         );
       }
-    }, 500);
+    }, 400);
   };
 
   return (

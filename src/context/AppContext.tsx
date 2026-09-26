@@ -196,6 +196,7 @@ interface AppContextType {
   updatePayrollAdjustment: (teacherId: string, month: number, year: number, bonus: number, deductions: number, notes?: string) => Promise<any>;
   markAllNotificationsRead: () => void;
   updateDatabaseState: (updater: (draft: DatabaseState) => void) => void;
+  changeUserPassword: (newPassword: string, currentPasswordInput?: string) => Promise<{ success: boolean; error?: string }>;
   resetDatabase: () => Promise<any>;
   importBackup: (backupJson: any) => Promise<any>;
 
@@ -450,15 +451,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const trimmedPassword = (password || '').trim();
 
     // Check matching user in db.users
-    const matchingUser = db.users.find(
+    let matchingUser = db.users.find(
       (u) =>
         u.email.toLowerCase() === trimmedEmail ||
         (u.nameAr && u.nameAr.toLowerCase() === trimmedEmail) ||
         (u.name && u.name.toLowerCase() === trimmedEmail)
     );
 
+    // If matching user not found by exact string, try matching by known roles and email aliases
     if (!matchingUser) {
-      // Check predefined accounts fallback
+      if (trimmedEmail === 'admin@zakirly.edu' || trimmedEmail === 'superadmin@zakirly.academy') {
+        matchingUser = db.users.find((u) => u.role === 'super_admin');
+      } else if (trimmedEmail === 'courses_director@zakirly.edu' || trimmedEmail === 'admin@zakirly.academy') {
+        matchingUser = db.users.find((u) => u.role === 'director_courses');
+      } else if (trimmedEmail === 'curriculum_director@zakirly.edu' || trimmedEmail === 'academic@zakirly.academy') {
+        matchingUser = db.users.find((u) => u.role === 'director_curriculum');
+      } else if (trimmedEmail === 'courses_supervisor@zakirly.edu') {
+        matchingUser = db.users.find((u) => u.role === 'supervisor_courses');
+      } else if (trimmedEmail === 'curriculum_supervisor@zakirly.edu') {
+        matchingUser = db.users.find((u) => u.role === 'supervisor_curriculum');
+      } else if (trimmedEmail === 'supervisor@zakirly.edu' || trimmedEmail === 'supervisor@zakirly.academy') {
+        matchingUser = db.users.find((u) => u.role === 'supervisor');
+      }
+    }
+
+    if (!matchingUser) {
+      // Predefined accounts fallback only if db.users is completely unseeded
       const isPredefinedAdmin = trimmedEmail === 'admin@zakirly.edu' || trimmedEmail === 'superadmin@zakirly.academy';
       const isPredefinedSupervisor = trimmedEmail === 'supervisor@zakirly.edu' || trimmedEmail === 'supervisor@zakirly.academy';
       const isPredefinedCoursesDirector = trimmedEmail === 'courses_director@zakirly.edu' || trimmedEmail === 'admin@zakirly.academy';
@@ -474,6 +492,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           name: 'مدير أكاديمية ذاكرلي الأقصى',
           email: trimmedEmail,
           role: targetRole,
+          password: trimmedPassword,
           status: 'active',
           lastLogin: new Date().toISOString(),
         };
@@ -492,6 +511,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           nameAr: 'مدير قسم الكورسات والدورات',
           email: trimmedEmail,
           role: 'director_courses',
+          password: trimmedPassword,
           status: 'active',
           lastLogin: new Date().toISOString(),
         };
@@ -511,6 +531,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           nameAr: 'مدير قسم المناهج الدراسية',
           email: trimmedEmail,
           role: 'director_curriculum',
+          password: trimmedPassword,
           status: 'active',
           lastLogin: new Date().toISOString(),
         };
@@ -530,6 +551,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           nameAr: 'مشرف قسم الكورسات',
           email: trimmedEmail,
           role: 'supervisor_courses',
+          password: trimmedPassword,
           status: 'active',
           lastLogin: new Date().toISOString(),
         };
@@ -549,6 +571,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           nameAr: 'مشرف قسم المناهج',
           email: trimmedEmail,
           role: 'supervisor_curriculum',
+          password: trimmedPassword,
           status: 'active',
           lastLogin: new Date().toISOString(),
         };
@@ -568,6 +591,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           name: 'مشرف أكاديمية ذاكرلي',
           email: trimmedEmail,
           role: targetRole,
+          password: trimmedPassword,
           status: 'active',
           lastLogin: new Date().toISOString(),
         };
@@ -582,8 +606,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return false;
     }
 
-    // Check user password
-    const expectedPassword = matchingUser.password || '123456';
+    // Check user password against actual saved password in database
+    const expectedPassword = matchingUser.password || (matchingUser.role === 'super_admin' ? 'admin123' : '123456');
     if (trimmedPassword !== expectedPassword) {
       // Password incorrect -> Invalid login!
       return false;
@@ -1787,6 +1811,111 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return { success: true };
   };
 
+  const changeUserPassword = async (
+    newPassword: string,
+    currentPasswordInput?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) {
+      return {
+        success: false,
+        error: lang === 'ar' ? 'لم يتم العثور على حساب مستخدم نشط' : 'No active user session',
+      };
+    }
+
+    const trimmedNew = (newPassword || '').trim();
+    if (trimmedNew.length < 4) {
+      return {
+        success: false,
+        error:
+          lang === 'ar'
+            ? 'كلمة المرور الجديدة يجب أن تكون 4 خانات أو أحرف على الأقل'
+            : 'Password must be at least 4 characters',
+      };
+    }
+
+    // Locate the user record in current db state
+    const userInDb = db.users.find(
+      (u) =>
+        u.id === currentUser.id ||
+        (currentUser.email && u.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+        (currentUser.role === 'super_admin' &&
+          (u.role === 'super_admin' ||
+            u.email.toLowerCase() === 'admin@zakirly.edu' ||
+            u.email.toLowerCase() === 'superadmin@zakirly.academy'))
+    );
+
+    const actualOldPassword =
+      currentUser.password ||
+      userInDb?.password ||
+      (currentUser.role === 'super_admin' ? 'admin123' : '123456');
+
+    // If currentPasswordInput was provided, strictly verify it
+    if (currentPasswordInput && currentPasswordInput.trim()) {
+      if (currentPasswordInput.trim() !== actualOldPassword) {
+        return {
+          success: false,
+          error:
+            lang === 'ar'
+              ? 'كلمة المرور الحالية غير صحيحة. يرجى التأكد من كتابتها بشكل سليم.'
+              : 'Current password is incorrect.',
+        };
+      }
+    }
+
+    // 1. Update currentUser in React State & localStorage immediately
+    const updatedUser: User = {
+      ...currentUser,
+      password: trimmedNew,
+    };
+    setCurrentUser(updatedUser);
+    try {
+      localStorage.setItem('zakirly_user_v2', JSON.stringify(updatedUser));
+      const remembered = localStorage.getItem('zakirly_remembered_credentials');
+      if (remembered) {
+        const parsed = JSON.parse(remembered);
+        parsed.password = trimmedNew;
+        localStorage.setItem('zakirly_remembered_credentials', JSON.stringify(parsed));
+      }
+    } catch (e) {
+      console.warn('Failed to update remembered user credentials', e);
+    }
+
+    // 2. Persist to Database State (Local, IndexedDB, Neon PostgreSQL Cloud, Server SSE)
+    updateDatabaseState((draft) => {
+      let matched = false;
+      draft.users.forEach((u) => {
+        const isMatch =
+          u.id === currentUser.id ||
+          (currentUser.email && u.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+          (currentUser.role === 'super_admin' &&
+            (u.role === 'super_admin' ||
+              u.email.toLowerCase() === 'admin@zakirly.edu' ||
+              u.email.toLowerCase() === 'superadmin@zakirly.academy'));
+
+        if (isMatch) {
+          u.password = trimmedNew;
+          matched = true;
+        }
+      });
+
+      if (!matched) {
+        draft.users.unshift({
+          id: currentUser.id || `usr-${Date.now()}`,
+          tenantId: currentUser.tenantId || activeTenantId,
+          name: currentUser.name || 'مدير أكاديمية ذاكرلي',
+          nameAr: currentUser.nameAr || currentUser.name || 'مدير أكاديمية ذاكرلي',
+          email: currentUser.email || 'admin@zakirly.edu',
+          role: currentUser.role || 'super_admin',
+          password: trimmedNew,
+          status: 'active',
+          lastLogin: new Date().toISOString(),
+        });
+      }
+    });
+
+    return { success: true };
+  };
+
   const createTenantProxy = <T extends { tenantId?: string }>(
     rawArray: T[],
     tenantId: string
@@ -1923,6 +2052,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updatePayrollAdjustment,
         markAllNotificationsRead,
         updateDatabaseState,
+        changeUserPassword,
         resetDatabase,
         importBackup,
         isSyncing,

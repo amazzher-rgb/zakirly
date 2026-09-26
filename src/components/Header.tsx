@@ -22,6 +22,9 @@ import {
   FileSpreadsheet,
   Coins,
   Database,
+  Eye,
+  EyeOff,
+  Loader2,
 } from 'lucide-react';
 import { CURRENCIES } from '../utils/currencyUtils';
 
@@ -44,6 +47,7 @@ export const Header: React.FC = () => {
     setIsMobileMenuOpen,
     currentUser,
     logout,
+    changeUserPassword,
   } = useApp();
 
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -54,6 +58,10 @@ export const Header: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [isChangingPass, setIsChangingPass] = useState(false);
   const [passFeedback, setPassFeedback] = useState<string | null>(null);
   const [passError, setPassError] = useState<string | null>(null);
 
@@ -71,35 +79,65 @@ export const Header: React.FC = () => {
   const currentTenant = availableTenants.find((t) => t.id === activeTenantId) || availableTenants[0] || db.tenants[0];
   const unreadCount = db.notifications.filter((n) => !n.read).length;
 
-  const handleChangePasswordSubmit = (e: React.FormEvent) => {
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPassError(null);
+    setPassFeedback(null);
 
-    if (newPassword.length < 4) {
-      setPassError(lang === 'ar' ? 'كلمة المرور يجب أن تكون 4 أحرف على الأقل' : 'Password must be at least 4 characters');
+    const cleanNewPass = (newPassword || '').trim();
+    const cleanConfirmPass = (confirmPassword || '').trim();
+    const cleanCurrentPass = (currentPassword || '').trim();
+
+    if (cleanNewPass.length < 4) {
+      setPassError(
+        lang === 'ar'
+          ? 'كلمة المرور الجديدة يجب أن تكون 4 أحرف أو أرقام على الأقل'
+          : 'Password must be at least 4 characters'
+      );
       return;
     }
 
-    if (newPassword !== confirmPassword) {
-      setPassError(lang === 'ar' ? 'كلمات المرور غير متطابقة' : 'Passwords do not match');
+    if (cleanNewPass !== cleanConfirmPass) {
+      setPassError(
+        lang === 'ar' ? 'كلمات المرور الجديدة غير متطابقة' : 'Passwords do not match'
+      );
       return;
     }
 
-    if (currentUser) {
-      currentUser.password = newPassword;
-      const userInDb = db.users.find((u) => u.id === currentUser.id || u.email === currentUser.email);
-      if (userInDb) {
-        userInDb.password = newPassword;
+    setIsChangingPass(true);
+    try {
+      const res = await changeUserPassword(cleanNewPass, cleanCurrentPass);
+      if (!res.success) {
+        setPassError(
+          res.error ||
+            (lang === 'ar' ? 'فشل تحديث كلمة المرور' : 'Failed to update password')
+        );
+        setIsChangingPass(false);
+        return;
       }
 
-      setPassFeedback(lang === 'ar' ? 'تم تغيير كلمة المرور بنجاح!' : 'Password changed successfully!');
+      setPassFeedback(
+        lang === 'ar'
+          ? `تم تغيير كلمة المرور بنجاح وحفظها سحابياً على جميع الأجهزة! كلمة المرور الجديدة: (${cleanNewPass})`
+          : `Password changed and saved to cloud successfully! New password: (${cleanNewPass})`
+      );
+
       setTimeout(() => {
         setPassFeedback(null);
         setIsChangePassOpen(false);
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
-      }, 2000);
+      }, 2500);
+    } catch (err: any) {
+      setPassError(
+        err.message ||
+          (lang === 'ar'
+            ? 'حدث خطأ غير متوقع أثناء حفظ كلمة المرور'
+            : 'Unexpected error saving password')
+      );
+    } finally {
+      setIsChangingPass(false);
     }
   };
 
@@ -329,13 +367,23 @@ export const Header: React.FC = () => {
       {/* Change Password Modal for Current User */}
       {isChangePassOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <form onSubmit={handleChangePasswordSubmit} className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+          <form
+            onSubmit={handleChangePasswordSubmit}
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scaleUp"
+          >
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
-                <Lock className="w-5 h-5 text-purple-600" />
-                <h3 className="font-extrabold text-slate-900 text-base">
-                  {lang === 'ar' ? 'تغيير كلمة المرور للحساب' : 'Change Password'}
-                </h3>
+                <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">
+                    {lang === 'ar' ? 'تغيير كلمة المرور للحساب' : 'Change Password'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    {currentUser?.nameAr || currentUser?.name || currentUser?.email || 'الحساب الأساسي'} ({currentUser?.email || 'admin@zakirly.edu'})
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
@@ -344,81 +392,135 @@ export const Header: React.FC = () => {
                   setPassError(null);
                   setPassFeedback(null);
                 }}
-                className="text-slate-400 hover:text-slate-800"
+                className="text-slate-400 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {passFeedback && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2 leading-relaxed">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{passFeedback}</span>
               </div>
             )}
 
             {passError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold">
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold leading-relaxed">
                 {passError}
               </div>
             )}
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3.5 text-xs">
               <div>
                 <label className="block text-slate-700 font-bold mb-1">
                   {lang === 'ar' ? 'كلمة المرور الحالية' : 'Current Password'}
                 </label>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full border border-slate-200 p-2.5 rounded-xl font-mono"
-                />
+                <div className="relative">
+                  <input
+                    type={showCurrentPass ? 'text' : 'password'}
+                    value={currentPassword}
+                    onChange={(e) => {
+                      setCurrentPassword(e.target.value);
+                      if (passError) setPassError(null);
+                    }}
+                    placeholder="••••••••"
+                    className="w-full border border-slate-200 p-2.5 pe-10 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPass(!showCurrentPass)}
+                    className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showCurrentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-slate-700 font-bold mb-1">
                   {lang === 'ar' ? 'كلمة المرور الجديدة*' : 'New Password*'}
                 </label>
-                <input
-                  type="password"
-                  required
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full border border-slate-200 p-2.5 rounded-xl font-mono"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPass ? 'text' : 'password'}
+                    required
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      if (passError) setPassError(null);
+                    }}
+                    placeholder="••••••••"
+                    className="w-full border border-slate-200 p-2.5 pe-10 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPass(!showNewPass)}
+                    className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {lang === 'ar' ? 'يجب أن لا تقل عن 4 خانات' : 'At least 4 characters'}
+                </p>
               </div>
 
               <div>
                 <label className="block text-slate-700 font-bold mb-1">
                   {lang === 'ar' ? 'تأكيد كلمة المرور الجديدة*' : 'Confirm New Password*'}
                 </label>
-                <input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full border border-slate-200 p-2.5 rounded-xl font-mono"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPass ? 'text' : 'password'}
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (passError) setPassError(null);
+                    }}
+                    placeholder="••••••••"
+                    className="w-full border border-slate-200 p-2.5 pe-10 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPass(!showConfirmPass)}
+                    className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="pt-3 border-t flex justify-end gap-2 text-xs font-bold">
               <button
                 type="button"
-                onClick={() => setIsChangePassOpen(false)}
-                className="px-4 py-2 border rounded-xl"
+                disabled={isChangingPass}
+                onClick={() => {
+                  setIsChangePassOpen(false);
+                  setPassError(null);
+                  setPassFeedback(null);
+                }}
+                className="px-4 py-2 border rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
               >
                 {lang === 'ar' ? 'إلغاء' : 'Cancel'}
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-md"
+                disabled={isChangingPass}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-xl shadow-md flex items-center gap-2 transition-all"
               >
-                {lang === 'ar' ? 'تأكيد وتحديث' : 'Update Password'}
+                {isChangingPass && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>
+                  {isChangingPass
+                    ? lang === 'ar'
+                      ? 'جاري الحفظ والمزامنة السحابية...'
+                      : 'Saving & Syncing...'
+                    : lang === 'ar'
+                    ? 'تأكيد وحفظ كلمة المرور'
+                    : 'Confirm & Save Password'}
+                </span>
               </button>
             </div>
           </form>
