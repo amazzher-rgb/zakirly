@@ -1870,14 +1870,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCurrentUser(updatedUser);
     try {
       localStorage.setItem('zakirly_user_v2', JSON.stringify(updatedUser));
-      const remembered = localStorage.getItem('zakirly_remembered_credentials');
-      if (remembered) {
-        const parsed = JSON.parse(remembered);
-        parsed.password = trimmedNew;
-        localStorage.setItem('zakirly_remembered_credentials', JSON.stringify(parsed));
-      }
+      localStorage.removeItem('zakirly_remembered_credentials');
     } catch (e) {
-      console.warn('Failed to update remembered user credentials', e);
+      console.warn('Failed to update user session storage', e);
     }
 
     // 2. Persist to Database State (Local, IndexedDB, Neon PostgreSQL Cloud, Server SSE)

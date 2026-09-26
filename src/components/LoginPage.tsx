@@ -19,39 +19,26 @@ import {
 export const LoginPage: React.FC = () => {
   const { login, db, activeTenantId, setActiveTenantId, lang, setLang } = useApp();
 
-  const getAccountPassword = (targetEmail: string, role: UserRole): string => {
-    try {
-      const remembered = localStorage.getItem('zakirly_remembered_credentials');
-      if (remembered) {
-        const parsed = JSON.parse(remembered);
-        if (parsed.email && parsed.email.toLowerCase() === targetEmail.toLowerCase() && parsed.password) {
-          return parsed.password;
-        }
-      }
-    } catch {}
-
-    const u = db.users.find(
-      (user) =>
-        user.email.toLowerCase() === targetEmail.toLowerCase() ||
-        (role === 'super_admin' &&
-          (user.role === 'super_admin' ||
-            user.email.toLowerCase() === 'admin@zakirly.edu' ||
-            user.email.toLowerCase() === 'superadmin@zakirly.academy')) ||
-        user.role === role
-    );
-    if (u?.password) return u.password;
-    if (role === 'super_admin') return 'admin123';
-    if (role === 'supervisor') return 'supervisor123';
-    return '123456';
-  };
-
   const [selectedRole, setSelectedRole] = useState<UserRole>('super_admin');
-  const [email, setEmail] = useState('admin@zakirly.edu');
-  const [password, setPassword] = useState(() => getAccountPassword('admin@zakirly.edu', 'super_admin'));
+  const [email, setEmail] = useState(() => {
+    try {
+      const savedEmail = localStorage.getItem('zakirly_remembered_email');
+      if (savedEmail) return savedEmail;
+    } catch {}
+    return 'admin@zakirly.edu';
+  });
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Clear any legacy saved plain passwords in browser storage for security
+  React.useEffect(() => {
+    try {
+      localStorage.removeItem('zakirly_remembered_credentials');
+    } catch {}
+  }, []);
 
   const handleRoleChange = (newRole: UserRole) => {
     setSelectedRole(newRole);
@@ -74,7 +61,8 @@ export const LoginPage: React.FC = () => {
       targetEmail = 'supervisor@zakirly.edu';
     }
     setEmail(targetEmail);
-    setPassword(getAccountPassword(targetEmail, newRole));
+    // Explicitly reset password field - user must manually enter password
+    setPassword('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -87,7 +75,7 @@ export const LoginPage: React.FC = () => {
     }
 
     if (!password.trim()) {
-      setErrorMessage(lang === 'ar' ? 'يرجى إدخال كلمة المرور' : 'Please enter password');
+      setErrorMessage(lang === 'ar' ? 'يرجى إدخال كلمة المرور للمتابعة' : 'Please enter password to continue');
       return;
     }
 
@@ -99,14 +87,18 @@ export const LoginPage: React.FC = () => {
       if (success) {
         if (rememberMe) {
           try {
-            localStorage.setItem('zakirly_remembered_credentials', JSON.stringify({ email, password }));
+            localStorage.setItem('zakirly_remembered_email', email);
+          } catch {}
+        } else {
+          try {
+            localStorage.removeItem('zakirly_remembered_email');
           } catch {}
         }
       } else {
         setErrorMessage(
           lang === 'ar'
-            ? 'خطأ في تسجيل الدخول: البريد الإلكتروني أو كلمة المرور غير صحيحة. يرجى كتابة كلمة المرور الصحيحة بعد التحديث.'
-            : 'Login failed: Invalid email or password. Please check your password.'
+            ? 'خطأ في تسجيل الدخول: البريد الإلكتروني أو كلمة المرور غير صحيحة. يرجى كتابة كلمة المرور الصحيحة.'
+            : 'Login failed: Invalid email or password. Please check your credentials.'
         );
       }
     }, 400);
@@ -248,14 +240,15 @@ export const LoginPage: React.FC = () => {
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5 text-blue-400" />
-                <span>كلمة المرور:</span>
+                <span>{lang === 'ar' ? 'كلمة المرور:' : 'Password:'}</span>
               </label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={lang === 'ar' ? 'أدخل كلمة المرور...' : 'Enter your password...'}
+                  autoComplete="current-password"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl ps-4 pe-10 py-2.5 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dir-ltr text-start transition-all"
                   required
                 />
@@ -278,7 +271,7 @@ export const LoginPage: React.FC = () => {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500 w-4 h-4"
                 />
-                <span>تذكر بيانات الدخول</span>
+                <span>{lang === 'ar' ? 'تذكر اسم الحساب' : 'Remember account email'}</span>
               </label>
               <button
                 type="button"

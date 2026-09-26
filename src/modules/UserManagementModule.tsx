@@ -212,14 +212,7 @@ export const UserManagementModule: React.FC = () => {
     });
 
     try {
-      const remembered = localStorage.getItem('zakirly_remembered_credentials');
-      if (remembered && targetUser?.email) {
-        const parsed = JSON.parse(remembered);
-        if (parsed.email && parsed.email.toLowerCase() === targetUser.email.toLowerCase()) {
-          parsed.password = trimmedNewPass;
-          localStorage.setItem('zakirly_remembered_credentials', JSON.stringify(parsed));
-        }
-      }
+      localStorage.removeItem('zakirly_remembered_credentials');
     } catch {}
 
     setMsg(`تم تغيير كلمة المرور للمستخدم (${targetUser?.nameAr || targetUser?.name || ''}) إلى: (${trimmedNewPass}) بنجاح.`);
