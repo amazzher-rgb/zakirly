@@ -31,6 +31,7 @@ const MainContent: React.FC = () => {
   const supervisorAllowedModules = [
     'students',
     'teachers',
+    'parents',
     'courses',
     'languages',
     'attendance',
@@ -55,7 +56,7 @@ const MainContent: React.FC = () => {
             صلاحيات محددة للمشرف الأكاديمي
           </h2>
           <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
-            تم تحديد نطاق عمل المشرف في متابعة المناهج والدورات، الطلاب، المعلمين، شيت الحصص التجريبية، تسجيل الغياب والحضور، وجدولة الحصص والمواعيد. باقي أقسام النظام (المالية، التقارير، الإعدادات) خارج نطاق صلاحيات المشرف.
+            تم تحديد نطاق عمل المشرف في متابعة المناهج والدورات، الطلاب، أولياء الأمور، المعلمين، شيت الحصص التجريبية، تسجيل الغياب والحضور، وجدولة الحصص والمواعيد. باقي أقسام النظام (المالية، التقارير، الإعدادات) خارج نطاق صلاحيات المشرف.
           </p>
           <div className="flex flex-wrap justify-center gap-2 pt-2">
             <button

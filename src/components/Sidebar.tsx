@@ -127,7 +127,15 @@ export const Sidebar: React.FC = () => {
       titleEn: 'Parents Portal',
       icon: UserCheck,
       badge: db.parents.length,
-      allowedRoles: ['super_admin', 'director_courses', 'director_curriculum', 'accountant'],
+      allowedRoles: [
+        'super_admin',
+        'director_courses',
+        'director_curriculum',
+        'supervisor',
+        'supervisor_courses',
+        'supervisor_curriculum',
+        'accountant',
+      ],
     },
     {
       id: 'courses',

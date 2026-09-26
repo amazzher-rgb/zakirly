@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   GraduationCap,
   Users,
+  UserCheck,
   CheckCircle2,
   CalendarDays,
   Receipt,
@@ -13,9 +14,15 @@ import {
 export const MobileBottomNav: React.FC = () => {
   const { activeModule, setActiveModule, isMobileMenuOpen, setIsMobileMenuOpen, lang, role } = useApp();
 
+  const isSupervisorRole =
+    role === 'supervisor' ||
+    role === 'supervisor_courses' ||
+    role === 'supervisor_curriculum';
+
   const allNavItems = [
     { id: 'dashboard', labelAr: 'الرئيسية', labelEn: 'Home', icon: LayoutDashboard, supervisor: false },
     { id: 'students', labelAr: 'الطلاب', labelEn: 'Students', icon: GraduationCap, supervisor: true },
+    { id: 'parents', labelAr: 'أولياء الأمور', labelEn: 'Parents', icon: UserCheck, supervisor: true },
     { id: 'teachers', labelAr: 'المعلمين', labelEn: 'Teachers', icon: Users, supervisor: true },
     { id: 'attendance', labelAr: 'الغياب', labelEn: 'Attendance', icon: CheckCircle2, supervisor: true },
     { id: 'scheduling', labelAr: 'الجداول', labelEn: 'Schedule', icon: CalendarDays, supervisor: true },
@@ -23,10 +30,10 @@ export const MobileBottomNav: React.FC = () => {
   ];
 
   const primaryNavItems = allNavItems.filter((item) => {
-    if (role === 'supervisor') {
+    if (isSupervisorRole) {
       return item.supervisor;
     }
-    return ['dashboard', 'students', 'scheduling', 'finance'].includes(item.id);
+    return ['dashboard', 'students', 'parents', 'scheduling', 'finance'].includes(item.id);
   });
 
   return (
