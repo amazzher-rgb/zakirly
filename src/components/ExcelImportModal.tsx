@@ -409,7 +409,10 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             const courseTitleAr = course?.titleAr || item.courseTitleAr;
 
             if (targetSession) {
-              targetSession.date = item.date;
+              targetSession.dayOfWeek = item.dayOfWeek;
+              targetSession.dayNameAr = item.dayNameAr;
+              targetSession.dayNum = item.dayNum;
+              targetSession.date = item.dayNameAr || item.date;
               targetSession.startTime = item.startTime;
               targetSession.endTime = item.endTime;
               targetSession.durationMinutes = item.durationMinutes;
@@ -437,7 +440,10 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                 courseId,
                 courseTitleAr,
                 subjectNameAr: courseTitleAr,
-                date: item.date,
+                dayOfWeek: item.dayOfWeek,
+                dayNameAr: item.dayNameAr,
+                dayNum: item.dayNum,
+                date: item.dayNameAr || item.date,
                 startTime: item.startTime,
                 endTime: item.endTime,
                 durationMinutes: item.durationMinutes,
@@ -715,7 +721,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                       {type === 'sessions' && (
                         <tr>
                           <th className="p-3">#</th>
-                          <th className="p-3">تاريخ الحصة</th>
+                          <th className="p-3">يوم الحصة الأسبوعي</th>
                           <th className="p-3">الوقت</th>
                           <th className="p-3">المدة</th>
                           <th className="p-3">اسم الطالب</th>
@@ -780,7 +786,11 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                         parsedSessions.map((ses, idx) => (
                           <tr key={idx} className="hover:bg-slate-50 transition-colors">
                             <td className="p-3 text-slate-400 font-mono">{idx + 1}</td>
-                            <td className="p-3 font-mono font-bold text-slate-900">{ses.date}</td>
+                            <td className="p-3">
+                              <span className="px-2 py-0.5 rounded-lg bg-blue-50 text-blue-800 font-extrabold text-xs border border-blue-100">
+                                يوم {ses.dayNameAr || ses.date}
+                              </span>
+                            </td>
                             <td className="p-3 font-mono text-blue-700 font-bold">{ses.startTime}</td>
                             <td className="p-3 text-slate-600">{ses.durationMinutes} دقيقة</td>
                             <td className="p-3 font-bold text-slate-800">{ses.studentNameAr}</td>

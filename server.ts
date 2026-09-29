@@ -954,18 +954,27 @@ async function startServer() {
 
   // Sessions CRUD
   app.post('/api/sessions', (req: Request, res: Response) => {
-    const { teacherId, studentId, courseId, date, startTime, durationMinutes } = req.body;
+    const { teacherId, studentId, courseId, date, startTime, durationMinutes, dayOfWeek, dayNameAr, dayNum } = req.body;
 
     if (!teacherId || !studentId) {
       return res.status(400).json({ success: false, message: 'يرجى اختيار المعلم والطالب لجدولة الحصة' });
     }
 
-    // Check Schedule Clash for Teacher or Student
-    const teacherClash = db.sessions.find(
-      (s) => teacherId && s.teacherId === teacherId && s.date === date && s.startTime === startTime && s.status === 'scheduled'
-    );
+    // Resolve day of week
+    const targetDayOfWeek = dayOfWeek || (date && date.includes('day') ? date : undefined);
+    const targetDayNameAr = dayNameAr || date;
+
+    // Check Schedule Clash for Teacher in the same day & time
+    const teacherClash = db.sessions.find((s) => {
+      if (s.teacherId !== teacherId || s.startTime !== startTime || s.status !== 'scheduled') return false;
+      if (targetDayOfWeek && s.dayOfWeek && s.dayOfWeek === targetDayOfWeek) return true;
+      if (targetDayNameAr && (s.dayNameAr === targetDayNameAr || s.date === targetDayNameAr)) return true;
+      if (date && s.date === date) return true;
+      return false;
+    });
+
     if (teacherClash) {
-      return res.status(400).json({ success: false, message: 'تعارض مواعيد! المعلم لديه حصة مجدولة بالفعل في هذا التوقيت.' });
+      return res.status(400).json({ success: false, message: 'تعارض مواعيد! المعلم لديه حصة مجدولة بالفعل في هذا اليوم والتوقيت.' });
     }
 
     const teacher = db.teachers.find((t) => t.id === teacherId);
@@ -988,7 +997,10 @@ async function startServer() {
       teacherNameAr: req.body.teacherNameAr || (teacher ? teacher.nameAr : 'المعلم'),
       studentId: studentId,
       studentNameAr: req.body.studentNameAr || (student ? student.nameAr : 'الطالب'),
-      date: date || new Date().toISOString().split('T')[0],
+      dayOfWeek: targetDayOfWeek,
+      dayNameAr: targetDayNameAr,
+      dayNum: typeof dayNum === 'number' ? dayNum : undefined,
+      date: date || targetDayNameAr || new Date().toISOString().split('T')[0],
       startTime: startTime || '17:00',
       endTime: endTime,
       durationMinutes: dur,

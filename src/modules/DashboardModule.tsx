@@ -29,15 +29,20 @@ import {
   Cell,
   Legend,
 } from 'recharts';
+import { getSessionDay } from './SchedulingModule';
 
 export const DashboardModule: React.FC = () => {
   const { kpis, db, lang, completeSession, convertTrial, processPayment, setActiveModule, currencySymbol } = useApp();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
 
-  // Filter today's sessions
+  // Filter today's sessions based on day of week or calendar date
   const todayStr = new Date().toISOString().split('T')[0];
-  const todaySessions = db.sessions.filter((s) => s.date === todayStr);
+  const todayDayNum = new Date().getDay();
+  const todaySessions = db.sessions.filter((s) => {
+    const dayInfo = getSessionDay(s);
+    return dayInfo.dayNum === todayDayNum || s.date === todayStr;
+  });
 
   // Subscriptions needing renewal (remaining sessions <= 2)
   const pendingRenewals = db.subscriptions.filter((s) => s.remainingSessions <= 2);
@@ -320,6 +325,9 @@ export const DashboardModule: React.FC = () => {
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
+                      <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-extrabold border border-blue-100">
+                        يوم {getSessionDay(session).nameAr}
+                      </span>
                       <span className="font-extrabold text-slate-900">{session.subjectNameAr}</span>
                       <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-bold">
                         {session.startTime} - {session.endTime}

@@ -4,16 +4,59 @@ import { CalendarDays, Plus, Clock, Video, User, BookOpen, AlertCircle, CheckCir
 import { ExcelImportModal } from '../components/ExcelImportModal';
 import { exportToExcel } from '../utils/excelExporter';
 
-const WEEK_DAYS = [
+export const WEEK_DAYS = [
   { id: 'all', nameAr: 'جميع الأيام', dayNum: -1 },
+  { id: 'saturday', nameAr: 'السبت', dayNum: 6 },
   { id: 'sunday', nameAr: 'الأحد', dayNum: 0 },
   { id: 'monday', nameAr: 'الإثنين', dayNum: 1 },
   { id: 'tuesday', nameAr: 'الثلاثاء', dayNum: 2 },
   { id: 'wednesday', nameAr: 'الأربعاء', dayNum: 3 },
   { id: 'thursday', nameAr: 'الخميس', dayNum: 4 },
   { id: 'friday', nameAr: 'الجمعة', dayNum: 5 },
-  { id: 'saturday', nameAr: 'السبت', dayNum: 6 },
 ];
+
+export const getSessionDay = (session: any): { id: string; nameAr: string; dayNum: number } => {
+  if (!session) return WEEK_DAYS[1];
+
+  if (session.dayOfWeek) {
+    const found = WEEK_DAYS.find((w) => w.id === session.dayOfWeek);
+    if (found) return found;
+  }
+
+  if (session.dayNameAr) {
+    const clean = String(session.dayNameAr).trim();
+    const found = WEEK_DAYS.find((w) => w.id !== 'all' && (clean === w.nameAr || clean.includes(w.nameAr) || w.nameAr.includes(clean)));
+    if (found) return found;
+  }
+
+  if (typeof session.dayNum === 'number' && session.dayNum >= 0 && session.dayNum <= 6) {
+    const found = WEEK_DAYS.find((w) => w.dayNum === session.dayNum);
+    if (found) return found;
+  }
+
+  if (session.date) {
+    const str = String(session.date).trim();
+    const foundAr = WEEK_DAYS.find((w) => w.id !== 'all' && (str.includes(w.nameAr) || w.nameAr.includes(str)));
+    if (foundAr) return foundAr;
+
+    const foundId = WEEK_DAYS.find((w) => w.id === str.toLowerCase());
+    if (foundId) return foundId;
+
+    const parts = str.split('T')[0].split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        const num = new Date(year, month, day).getDay();
+        const found = WEEK_DAYS.find((w) => w.dayNum === num);
+        if (found) return found;
+      }
+    }
+  }
+
+  return WEEK_DAYS.find((w) => w.id === 'saturday') || WEEK_DAYS[1];
+};
 
 export const SchedulingModule: React.FC = () => {
   const { db, lang, createSession, completeSession, updateDatabaseState } = useApp();
@@ -24,40 +67,33 @@ export const SchedulingModule: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({});
 
-  // Form state
+  // Form state - Day of week based
+  const [selectedDayId, setSelectedDayId] = useState('saturday');
   const [teacherId, setTeacherId] = useState(db.teachers[0]?.id || '');
   const [studentId, setStudentId] = useState(db.students[0]?.id || '');
   const [courseId, setCourseId] = useState(db.courseSubjects[0]?.id || '');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('17:00');
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [customTeamsLink, setCustomTeamsLink] = useState('');
 
-  // Helper to parse YYYY-MM-DD date safely in local time to avoid timezone offsets
-  const getDayNumFromDateStr = (dateStr: string) => {
-    if (!dateStr) return -1;
-    const parts = dateStr.split('T')[0].split('-');
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      return new Date(year, month, day).getDay();
+  const openAddModalForDay = (targetDay: string | number = 'saturday') => {
+    let resolvedDayId = 'saturday';
+    if (typeof targetDay === 'string') {
+      if (targetDay !== 'all') {
+        resolvedDayId = targetDay;
+      } else if (selectedDayTab !== 'all') {
+        resolvedDayId = selectedDayTab;
+      }
+    } else if (typeof targetDay === 'number') {
+      if (targetDay !== -1) {
+        const found = WEEK_DAYS.find((w) => w.dayNum === targetDay);
+        if (found) resolvedDayId = found.id;
+      } else if (selectedDayTab !== 'all') {
+        resolvedDayId = selectedDayTab;
+      }
     }
-    return new Date(dateStr).getDay();
-  };
 
-  const openAddModalForDay = (dayNum: number) => {
-    if (dayNum !== -1) {
-      // Calculate date for the selected day in current week
-      const today = new Date();
-      const currentDayNum = today.getDay();
-      const diff = dayNum - currentDayNum;
-      const targetDate = new Date(today);
-      targetDate.setDate(today.getDate() + diff);
-      setDate(targetDate.toISOString().split('T')[0]);
-    } else {
-      setDate(new Date().toISOString().split('T')[0]);
-    }
+    setSelectedDayId(resolvedDayId);
 
     // Auto-select valid teacher, student, course if empty
     const validTeacher = db.teachers.find((t) => t.id === teacherId) || db.teachers[0];
@@ -94,6 +130,7 @@ export const SchedulingModule: React.FC = () => {
     const effTeacherId = selectedTeacher.id;
     const effStudentId = selectedStudent.id;
     const effCourseId = selectedCourse ? selectedCourse.id : 'cs-101';
+    const dayObj = WEEK_DAYS.find((w) => w.id === selectedDayId) || WEEK_DAYS[1];
 
     const res = await createSession({
       teacherId: effTeacherId,
@@ -102,7 +139,10 @@ export const SchedulingModule: React.FC = () => {
       studentNameAr: selectedStudent.nameAr,
       courseId: effCourseId,
       courseTitleAr: selectedCourse ? selectedCourse.titleAr : 'مادة تعليمية',
-      date,
+      dayOfWeek: dayObj.id,
+      dayNameAr: dayObj.nameAr,
+      dayNum: dayObj.dayNum,
+      date: dayObj.nameAr, // Session is bound to day of week, permanently remaining in this day
       startTime,
       durationMinutes,
       meetingUrl: customTeamsLink.trim() || `https://teams.microsoft.com/l/meetup-join/zakirly-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -126,38 +166,29 @@ export const SchedulingModule: React.FC = () => {
     setDeletingSessionId(null);
   };
 
-  // Helper to get day name for a date string
-  const getDayNameFromDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const dayIndex = getDayNumFromDateStr(dateStr);
-    const dayObj = WEEK_DAYS.find((w) => w.dayNum === dayIndex);
-    return dayObj ? dayObj.nameAr : '';
-  };
-
-  // Filter sessions by selected tab
+  // Filter sessions by selected tab using day-of-week info
   const filteredSessions = db.sessions.filter((session) => {
     if (selectedDayTab === 'all') return true;
-    const targetDay = WEEK_DAYS.find((w) => w.id === selectedDayTab);
-    if (!targetDay) return true;
-    const sessionDayNum = getDayNumFromDateStr(session.date);
-    return sessionDayNum === targetDay.dayNum;
+    return getSessionDay(session).id === selectedDayTab;
   });
 
   const handleExport = () => {
-    const exportData = filteredSessions.map((s) => ({
-      'كود الحصة': s.code,
-      'تاريخ الحصة': s.date,
-      'اليوم': getDayNameFromDate(s.date),
-      'وقت البدء': s.startTime,
-      'وقت الانتهاء': s.endTime,
-      'المدة بالدقائق': s.durationMinutes,
-      'اسم الطالب': s.studentNameAr,
-      'اسم المعلم': s.teacherNameAr,
-      'المادة الدراسية': s.subjectNameAr || (s as any).courseTitleAr || '',
-      'رابط Microsoft Teams': s.meetingUrl || '',
-      'الحالة': s.status === 'completed' ? 'مكتملة' : s.status === 'cancelled' ? 'ملغاة' : 'مجدولة',
-      'ملاحظات': s.notes || '',
-    }));
+    const exportData = filteredSessions.map((s) => {
+      const dayInfo = getSessionDay(s);
+      return {
+        'كود الحصة': s.code,
+        'يوم الحصة': dayInfo.nameAr,
+        'وقت البدء': s.startTime,
+        'وقت الانتهاء': s.endTime,
+        'المدة بالدقائق': s.durationMinutes,
+        'اسم الطالب': s.studentNameAr,
+        'اسم المعلم': s.teacherNameAr,
+        'المادة الدراسية': s.subjectNameAr || (s as any).courseTitleAr || '',
+        'رابط Microsoft Teams': s.meetingUrl || '',
+        'الحالة': s.status === 'completed' ? 'مكتملة' : s.status === 'cancelled' ? 'ملغاة' : 'مجدولة',
+        'ملاحظات': s.notes || '',
+      };
+    });
     exportToExcel(exportData, 'جدول_الحصص_الأسبوعي_أكاديمية_ذاكرلي', 'جدول_الحصص');
   };
 
@@ -200,7 +231,7 @@ export const SchedulingModule: React.FC = () => {
           </button>
 
           <button
-            onClick={() => openAddModalForDay(-1)}
+            onClick={() => openAddModalForDay('saturday')}
             className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
@@ -215,7 +246,7 @@ export const SchedulingModule: React.FC = () => {
           {WEEK_DAYS.map((day) => {
             const count = day.id === 'all'
               ? db.sessions.length
-              : db.sessions.filter((s) => getDayNumFromDateStr(s.date) === day.dayNum).length;
+              : db.sessions.filter((s) => getSessionDay(s).id === day.id).length;
 
             return (
               <button
@@ -269,7 +300,7 @@ export const SchedulingModule: React.FC = () => {
 
           {WEEK_DAYS.filter((w) => w.id !== 'all').map((day) => {
             const isCollapsed = !!collapsedDays[day.id];
-            const daySessions = db.sessions.filter((s) => getDayNumFromDateStr(s.date) === day.dayNum);
+            const daySessions = db.sessions.filter((s) => getSessionDay(s).id === day.id);
 
             return (
               <div key={day.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -288,7 +319,7 @@ export const SchedulingModule: React.FC = () => {
                         </span>
                       </h3>
                       <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                        جدول قاعات Microsoft Teams وحضور طلاب يوم {day.nameAr}
+                        جدول قاعات Microsoft Teams وحضور طلاب يوم {day.nameAr} (ثابت أسبوعياً)
                       </p>
                     </div>
                   </div>
@@ -298,7 +329,7 @@ export const SchedulingModule: React.FC = () => {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        openAddModalForDay(day.dayNum);
+                        openAddModalForDay(day.id);
                       }}
                       className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1"
                     >
@@ -320,7 +351,7 @@ export const SchedulingModule: React.FC = () => {
                         <p>لا توجد حصص مجدولة ليوم {day.nameAr} حالياً.</p>
                         <button
                           type="button"
-                          onClick={() => openAddModalForDay(day.dayNum)}
+                          onClick={() => openAddModalForDay(day.id)}
                           className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs hover:bg-blue-100 transition-colors"
                         >
                           + إضافة أول حصة لـ {day.nameAr}
@@ -334,7 +365,6 @@ export const SchedulingModule: React.FC = () => {
                             session={session}
                             onDelete={() => setDeletingSessionId(session.id)}
                             onComplete={() => completeSession(session.id, 'present', 'تم الحضور بنجاح')}
-                            getDayNameFromDate={getDayNameFromDate}
                           />
                         ))}
                       </div>
@@ -354,7 +384,7 @@ export const SchedulingModule: React.FC = () => {
             </h3>
 
             <button
-              onClick={() => openAddModalForDay(WEEK_DAYS.find((w) => w.id === selectedDayTab)?.dayNum ?? -1)}
+              onClick={() => openAddModalForDay(selectedDayTab)}
               className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" />
@@ -366,7 +396,7 @@ export const SchedulingModule: React.FC = () => {
             <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500 font-bold space-y-2">
               <p>لا توجد حصص مجدولة لهذا اليوم.</p>
               <button
-                onClick={() => openAddModalForDay(WEEK_DAYS.find((w) => w.id === selectedDayTab)?.dayNum ?? -1)}
+                onClick={() => openAddModalForDay(selectedDayTab)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow"
               >
                 + جدول حصة الآن
@@ -380,7 +410,6 @@ export const SchedulingModule: React.FC = () => {
                   session={session}
                   onDelete={() => setDeletingSessionId(session.id)}
                   onComplete={() => completeSession(session.id, 'present', 'تم الحضور بنجاح')}
-                  getDayNameFromDate={getDayNameFromDate}
                 />
               ))}
             </div>
@@ -393,7 +422,10 @@ export const SchedulingModule: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <form onSubmit={handleCreate} className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-extrabold text-slate-900 text-base">جدولة حصة جديدة (Microsoft Teams)</h3>
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base">جدولة حصة جديدة (Microsoft Teams)</h3>
+                <p className="text-[11px] text-slate-500">حصة أسبوعية مرتبطة باليوم المحدد وتبقى ثابتة فيه</p>
+              </div>
               <button type="button" onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-800">
                 <X className="w-5 h-5" />
               </button>
@@ -448,18 +480,55 @@ export const SchedulingModule: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">تاريخ الحصة*</label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full border border-slate-200 p-2 rounded-xl font-mono"
-                  />
+              {/* Day of Week Selection (NOT calendar date) */}
+              <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-800 font-extrabold text-xs">
+                    يوم الحصة من أيام الأسبوع*
+                  </label>
+                  <span className="text-[10px] text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-md font-bold">
+                    ثابت أسبوعياً
+                  </span>
                 </div>
 
+                {/* Quick Selection Buttons for Weekdays */}
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1">
+                  {WEEK_DAYS.filter((w) => w.id !== 'all').map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setSelectedDayId(d.id)}
+                      className={`py-1.5 px-0.5 rounded-xl text-[11px] font-extrabold transition-all text-center border ${
+                        selectedDayId === d.id
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {d.nameAr}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Dropdown for explicit selection */}
+                <select
+                  value={selectedDayId}
+                  onChange={(e) => setSelectedDayId(e.target.value)}
+                  className="w-full border border-slate-200 p-2 rounded-xl font-extrabold bg-white text-slate-800 text-xs"
+                  required
+                >
+                  {WEEK_DAYS.filter((w) => w.id !== 'all').map((d) => (
+                    <option key={d.id} value={d.id}>
+                      يوم {d.nameAr} (ثابت أسبوعياً)
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  الحصة غير مرتبطة بتاريخ ميلادي؛ ستبقى موجودة أسبوعياً في يوم {WEEK_DAYS.find((w) => w.id === selectedDayId)?.nameAr}.
+                </p>
+              </div>
+
+              {/* Time & Duration */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-slate-700 font-bold mb-1">وقت البدء*</label>
                   <input
@@ -467,8 +536,23 @@ export const SchedulingModule: React.FC = () => {
                     required
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full border border-slate-200 p-2 rounded-xl font-mono"
+                    className="w-full border border-slate-200 p-2.5 rounded-xl font-mono text-xs font-bold"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">المدة (بالدقائق)*</label>
+                  <select
+                    value={durationMinutes}
+                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                    className="w-full border border-slate-200 p-2.5 rounded-xl font-bold text-xs"
+                  >
+                    <option value={30}>30 دقيقة</option>
+                    <option value={45}>45 دقيقة</option>
+                    <option value={60}>60 دقيقة (ساعة)</option>
+                    <option value={90}>90 دقيقة (ساعة ونصف)</option>
+                    <option value={120}>120 دقيقة (ساعتان)</option>
+                  </select>
                 </div>
               </div>
 
@@ -526,8 +610,9 @@ const SessionCard: React.FC<{
   session: any;
   onDelete: () => void;
   onComplete: () => void;
-  getDayNameFromDate: (dateStr: string) => string;
-}> = ({ session, onDelete, onComplete, getDayNameFromDate }) => {
+}> = ({ session, onDelete, onComplete }) => {
+  const dayInfo = getSessionDay(session);
+
   return (
     <div
       className={`p-3 sm:p-4 rounded-2xl border transition-all flex flex-col justify-between text-start ${
@@ -539,8 +624,8 @@ const SessionCard: React.FC<{
       <div className="space-y-2">
         <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 gap-1">
           <div className="min-w-0">
-            <span className="text-[9px] sm:text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md ml-1 inline-block">
-              {getDayNameFromDate(session.date)}
+            <span className="text-[9px] sm:text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md ml-1 inline-block border border-blue-100">
+              يوم {dayInfo.nameAr}
             </span>
             <span className="font-extrabold text-slate-900 text-xs truncate inline-block">{session.subjectNameAr}</span>
           </div>
@@ -568,7 +653,7 @@ const SessionCard: React.FC<{
 
         <div className="space-y-1 text-[10px] sm:text-xs text-slate-700 bg-slate-50 p-2 rounded-xl border border-slate-100">
           <div className="flex items-center justify-between font-mono">
-            <span className="text-slate-400 text-[9px] sm:text-[10px]">الوقت:</span>
+            <span className="text-slate-400 text-[9px] sm:text-[10px]">الموعد:</span>
             <span className="font-bold text-blue-800 text-[10px] sm:text-xs">{session.startTime} - {session.endTime}</span>
           </div>
 

@@ -156,7 +156,10 @@ export interface ScheduledSession {
   teacherNameAr: string;
   studentId: string;
   studentNameAr: string;
-  date: string; // YYYY-MM-DD
+  dayOfWeek?: string; // 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
+  dayNameAr?: string; // 'السبت' | 'الأحد' | 'الإثنين' | 'الثلاثاء' | 'الأربعاء' | 'الخميس' | 'الجمعة'
+  dayNum?: number; // 0..6
+  date: string; // Day name or date string for compatibility
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   durationMinutes: number;

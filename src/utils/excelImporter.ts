@@ -387,8 +387,46 @@ export function downloadTeachersTemplate() {
 // SESSIONS (SCHEDULE) IMPORT & PARSING
 // ----------------------------------------------------
 
+const DAYS_LOOKUP = [
+  { id: 'saturday', nameAr: 'السبت', dayNum: 6, aliases: ['السبت', 'سبت', 'sat', 'saturday'] },
+  { id: 'sunday', nameAr: 'الأحد', dayNum: 0, aliases: ['الأحد', 'الاحد', 'أحد', 'احد', 'sun', 'sunday'] },
+  { id: 'monday', nameAr: 'الإثنين', dayNum: 1, aliases: ['الإثنين', 'الاثنين', 'إثنين', 'اثنين', 'mon', 'monday'] },
+  { id: 'tuesday', nameAr: 'الثلاثاء', dayNum: 2, aliases: ['الثلاثاء', 'ثلاثاء', 'tue', 'tuesday'] },
+  { id: 'wednesday', nameAr: 'الأربعاء', dayNum: 3, aliases: ['الأربعاء', 'الاربعاء', 'أربعاء', 'اربعاء', 'wed', 'wednesday'] },
+  { id: 'thursday', nameAr: 'الخميس', dayNum: 4, aliases: ['الخميس', 'خميس', 'thu', 'thursday'] },
+  { id: 'friday', nameAr: 'الجمعة', dayNum: 5, aliases: ['الجمعة', 'جمعة', 'fri', 'friday'] },
+];
+
+export function resolveDayOfWeek(val: any): { id: string; nameAr: string; dayNum: number } {
+  if (!val) return DAYS_LOOKUP[0];
+  const str = String(val).trim().toLowerCase();
+
+  for (const d of DAYS_LOOKUP) {
+    if (d.aliases.some((a) => str.includes(a))) {
+      return { id: d.id, nameAr: d.nameAr, dayNum: d.dayNum };
+    }
+  }
+
+  const parts = str.split('T')[0].split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(day)) {
+      const num = new Date(y, m, day).getDay();
+      const match = DAYS_LOOKUP.find((d) => d.dayNum === num);
+      if (match) return { id: match.id, nameAr: match.nameAr, dayNum: match.dayNum };
+    }
+  }
+
+  return DAYS_LOOKUP[0];
+}
+
 export interface ParsedSessionRow {
   code?: string;
+  dayOfWeek: string;
+  dayNameAr: string;
+  dayNum: number;
   date: string;
   startTime: string;
   endTime: string;
@@ -419,8 +457,20 @@ export function parseSessionsFromRows(
     const studentNameAr = String(studentNameRaw || 'طالب مجهول').trim();
     const teacherNameAr = String(teacherNameRaw || 'معلم الحصة').trim();
 
-    const dateVal = getRowValue(row, ['التاريخ', 'تاريخ الحصة', 'اليوم', 'Date', 'Session Date']);
-    const date = parseExcelDate(dateVal);
+    const dayVal = getRowValue(row, [
+      'يوم الحصة',
+      'اليوم',
+      'يوم',
+      'اليوم في الأسبوع',
+      'Day',
+      'Week Day',
+      'Day of Week',
+      'التاريخ',
+      'تاريخ الحصة',
+      'Date',
+      'Session Date',
+    ]);
+    const dayResolved = resolveDayOfWeek(dayVal);
 
     const timeVal = getRowValue(row, ['الوقت', 'الساعة', 'وقت البدء', 'Time', 'Start Time']);
     const startTime = parseExcelTime(timeVal);
@@ -451,16 +501,21 @@ export function parseSessionsFromRows(
     const notes = getRowValue(row, ['ملاحظات', 'Notes']);
     const code = getRowValue(row, ['كود الحصة', 'الكود', 'كود', 'Code', 'Session Code']);
 
-    // Check if session exists on same date, time, and with same student/teacher
+    // Check if session exists on same day of week, time, and with same student/teacher
     const existing = db.sessions.find(
       (s) =>
         (code && s.code.toLowerCase() === String(code).trim().toLowerCase()) ||
-        (s.date === date && s.startTime === startTime && (s.studentNameAr === studentNameAr || s.teacherNameAr === teacherNameAr))
+        ((s.dayOfWeek === dayResolved.id || s.dayNameAr === dayResolved.nameAr || s.date === dayResolved.nameAr) &&
+          s.startTime === startTime &&
+          (s.studentNameAr === studentNameAr || s.teacherNameAr === teacherNameAr))
     );
 
     result.push({
       code: code ? String(code).trim() : undefined,
-      date,
+      dayOfWeek: dayResolved.id,
+      dayNameAr: dayResolved.nameAr,
+      dayNum: dayResolved.dayNum,
+      date: dayResolved.nameAr,
       startTime,
       endTime,
       durationMinutes,
@@ -469,7 +524,7 @@ export function parseSessionsFromRows(
       courseTitleAr,
       meetingUrl,
       status,
-      notes: notes ? String(notes).trim() : 'تم الاستيراد آلياً عبر شيت Excel',
+      notes: notes ? String(notes).trim() : 'حصة أسبوعية مجدولة عبر Excel',
       isExisting: !!existing,
       existingId: existing?.id,
     });
@@ -479,13 +534,10 @@ export function parseSessionsFromRows(
 }
 
 export function downloadSessionsTemplate() {
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-  const dayAfter = new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0];
-
   const template = [
     {
       'كود الحصة': 'SES-5001',
-      'تاريخ الحصة': tomorrow,
+      'يوم الحصة': 'السبت',
       'وقت البدء': '17:00',
       'المدة بالدقائق': 60,
       'اسم الطالب': 'أحمد محمد علي',
@@ -493,11 +545,11 @@ export function downloadSessionsTemplate() {
       'المادة الدراسية': 'الرياضيات',
       'رابط Microsoft Teams': 'https://teams.microsoft.com/l/meetup-join/zakirly-demo-1',
       'الحالة': 'مجدولة',
-      'ملاحظات': 'مراجعة الباب الأول',
+      'ملاحظات': 'حصة أسبوعية ثابتة',
     },
     {
       'كود الحصة': 'SES-5002',
-      'تاريخ الحصة': dayAfter,
+      'يوم الحصة': 'الإثنين',
       'وقت البدء': '18:30',
       'المدة بالدقائق': 60,
       'اسم الطالب': 'سارة خالد محمود',
@@ -505,7 +557,19 @@ export function downloadSessionsTemplate() {
       'المادة الدراسية': 'اللغة الإنجليزية IGCSE',
       'رابط Microsoft Teams': 'https://teams.microsoft.com/l/meetup-join/zakirly-demo-2',
       'الحالة': 'مجدولة',
-      'ملاحظات': 'تدريب على Writing Section',
+      'ملاحظات': 'حصة أسبوعية ثابتة',
+    },
+    {
+      'كود الحصة': 'SES-5003',
+      'يوم الحصة': 'الأربعاء',
+      'وقت البدء': '16:00',
+      'المدة بالدقائق': 60,
+      'اسم الطالب': 'يوسف إبراهيم',
+      'اسم المعلم': 'م. هشام عبد المنعم',
+      'المادة الدراسية': 'الرياضيات المتقدمة',
+      'رابط Microsoft Teams': 'https://teams.microsoft.com/l/meetup-join/zakirly-demo-3',
+      'الحالة': 'مجدولة',
+      'ملاحظات': 'حصة أسبوعية ثابتة',
     },
   ];
 
