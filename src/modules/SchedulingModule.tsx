@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { CalendarDays, Plus, Clock, Video, User, BookOpen, AlertCircle, CheckCircle2, Play, X, Trash2, VideoOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { CalendarDays, Plus, Clock, Video, User, BookOpen, AlertCircle, CheckCircle2, Play, X, Trash2, VideoOff, ChevronDown, ChevronUp, FileSpreadsheet, Download } from 'lucide-react';
+import { ExcelImportModal } from '../components/ExcelImportModal';
+import { exportToExcel } from '../utils/excelExporter';
 
 const WEEK_DAYS = [
   { id: 'all', nameAr: 'جميع الأيام', dayNum: -1 },
@@ -17,6 +19,7 @@ export const SchedulingModule: React.FC = () => {
   const { db, lang, createSession, completeSession, updateDatabaseState } = useApp();
   const [selectedDayTab, setSelectedDayTab] = useState('all');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({});
@@ -140,6 +143,24 @@ export const SchedulingModule: React.FC = () => {
     return sessionDayNum === targetDay.dayNum;
   });
 
+  const handleExport = () => {
+    const exportData = filteredSessions.map((s) => ({
+      'كود الحصة': s.code,
+      'تاريخ الحصة': s.date,
+      'اليوم': getDayNameFromDate(s.date),
+      'وقت البدء': s.startTime,
+      'وقت الانتهاء': s.endTime,
+      'المدة بالدقائق': s.durationMinutes,
+      'اسم الطالب': s.studentNameAr,
+      'اسم المعلم': s.teacherNameAr,
+      'المادة الدراسية': s.subjectNameAr || (s as any).courseTitleAr || '',
+      'رابط Microsoft Teams': s.meetingUrl || '',
+      'الحالة': s.status === 'completed' ? 'مكتملة' : s.status === 'cancelled' ? 'ملغاة' : 'مجدولة',
+      'ملاحظات': s.notes || '',
+    }));
+    exportToExcel(exportData, 'جدول_الحصص_الأسبوعي_أكاديمية_ذاكرلي', 'جدول_الحصص');
+  };
+
   return (
     <div className="space-y-6">
       
@@ -159,13 +180,33 @@ export const SchedulingModule: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => openAddModalForDay(-1)}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>جدولة حصة جديدة</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setIsExcelImportOpen(true)}
+            className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-all border border-emerald-300 shadow-sm flex items-center gap-1.5"
+            title="رفع شيت Excel لجدول الحصص والتحديث الآلي"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>{lang === 'ar' ? 'رفع شيت Excel' : 'Import Excel'}</span>
+          </button>
+
+          <button
+            onClick={handleExport}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all border border-slate-200 flex items-center gap-1.5"
+            title="تصدير جدول الحصص الحالي إلى ملف Excel"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</span>
+          </button>
+
+          <button
+            onClick={() => openAddModalForDay(-1)}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>جدولة حصة جديدة</span>
+          </button>
+        </div>
       </div>
 
       {/* Day Navigation Tabs */}
@@ -468,6 +509,13 @@ export const SchedulingModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={isExcelImportOpen}
+        onClose={() => setIsExcelImportOpen(false)}
+        type="sessions"
+      />
 
     </div>
   );

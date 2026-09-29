@@ -24,8 +24,10 @@ import {
   Eye,
   LayoutGrid,
   List,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { exportToExcel } from '../utils/excelExporter';
+import { ExcelImportModal } from '../components/ExcelImportModal';
 import { CompletedSessionsDetailsModal } from '../components/CompletedSessionsDetailsModal';
 import { getStudentCompletedSessions } from '../utils/accountingUtils';
 import { CURRENCIES, getCurrencySymbol } from '../utils/currencyUtils';
@@ -38,6 +40,7 @@ export const StudentsModule: React.FC = () => {
   
   // Modal States
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -237,7 +240,15 @@ export const StudentsModule: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setIsExcelImportOpen(true)}
+            className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-all border border-emerald-300 shadow-sm flex items-center gap-1.5"
+            title="رفع شيت Excel لبيانات الطلاب والتحديث الآلي"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>{lang === 'ar' ? 'رفع شيت Excel' : 'Import Excel'}</span>
+          </button>
           <button
             onClick={handleExport}
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all border border-slate-200 flex items-center gap-1.5"
@@ -1120,6 +1131,13 @@ export const StudentsModule: React.FC = () => {
           cycle={activeCycle}
         />
       )}
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={isExcelImportOpen}
+        onClose={() => setIsExcelImportOpen(false)}
+        type="students"
+      />
 
     </div>
   );

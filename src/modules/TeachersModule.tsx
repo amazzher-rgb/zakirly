@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Teacher } from '../types';
-import { Users, Plus, Search, Star, Phone, Mail, BookOpen, DollarSign, Award, X, Edit2, Trash2, Key, Check, Calendar, ChevronDown, ChevronUp, Layers, Clock, Eye, CheckCircle2, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import { Users, Plus, Search, Star, Phone, Mail, BookOpen, DollarSign, Award, X, Edit2, Trash2, Key, Check, Calendar, ChevronDown, ChevronUp, Layers, Clock, Eye, CheckCircle2, RefreshCw, LayoutGrid, List, FileSpreadsheet, Download } from 'lucide-react';
 import { getCurrentAccountingCycle, getTeacherCycleSessions, getTeacherPostCycleSessions, getTeacherCompletedSessions } from '../utils/accountingUtils';
 import { CompletedSessionsDetailsModal } from '../components/CompletedSessionsDetailsModal';
 import { AccountingCycleSelectorBar } from '../components/AccountingCycleSelectorBar';
+import { ExcelImportModal } from '../components/ExcelImportModal';
+import { exportToExcel } from '../utils/excelExporter';
 
 export const TeachersModule: React.FC = () => {
   const { db, lang, createTeacher, updateDatabaseState, searchQuery, setSearchQuery, currencySymbol, activeCycle, activeTenantId } = useApp();
@@ -15,6 +17,7 @@ export const TeachersModule: React.FC = () => {
   const [viewingDetailsTeacher, setViewingDetailsTeacher] = useState<Teacher | null>(null);
   const [collapsedSubjects, setCollapsedSubjects] = useState<Record<string, boolean>>({});
   const [mobileViewMode, setMobileViewMode] = useState<'grid' | 'list'>('grid');
+  const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
 
   // Form State
   const [nameAr, setNameAr] = useState('');
@@ -196,6 +199,21 @@ export const TeachersModule: React.FC = () => {
     setDeletingTeacherId(null);
   };
 
+  const handleExport = () => {
+    const exportData = filteredTeachers.map((t) => ({
+      'كود المعلم': t.code,
+      'اسم المعلم': t.nameAr,
+      'البريد الإلكتروني': t.email,
+      'الهاتف': t.phone,
+      'التخصص / المواد': Array.isArray(t.subjects) ? t.subjects.join('، ') : t.subjects || '',
+      'سعر الحصة': t.perSessionRate,
+      'الحالة': t.status,
+      'إجمالي الحصص المنفذة': t.completedSessionsCount || 0,
+      'إجمالي الأرباح': t.totalEarned || 0,
+    }));
+    exportToExcel(exportData, 'قائمة_المعلمين_أكاديمية_ذاكرلي', 'المعلمين');
+  };
+
   const currentCycle = getCurrentAccountingCycle();
 
   return (
@@ -226,7 +244,7 @@ export const TeachersModule: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
           {/* Mobile View Toggle: 2 Columns Side by Side vs 1 Column */}
           <div className="flex md:hidden items-center bg-slate-100 p-1 rounded-xl shrink-0 border border-slate-200">
             <button
@@ -256,6 +274,24 @@ export const TeachersModule: React.FC = () => {
               <span className="text-[10px]">قائمة</span>
             </button>
           </div>
+
+          <button
+            onClick={() => setIsExcelImportOpen(true)}
+            className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-all border border-emerald-300 shadow-sm flex items-center gap-1.5"
+            title="رفع شيت Excel لبيانات المعلمين وحسابات الدخول"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>{lang === 'ar' ? 'رفع شيت Excel' : 'Import Excel'}</span>
+          </button>
+
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all border border-slate-200 flex items-center gap-1.5"
+            title="تصدير قائمة المعلمين الحالية إلى ملف Excel"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</span>
+          </button>
 
           <button
             onClick={handleOpenAdd}
@@ -658,6 +694,13 @@ export const TeachersModule: React.FC = () => {
           cycle={activeCycle}
         />
       )}
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={isExcelImportOpen}
+        onClose={() => setIsExcelImportOpen(false)}
+        type="teachers"
+      />
 
     </div>
   );
