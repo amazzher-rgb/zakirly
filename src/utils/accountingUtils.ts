@@ -1,5 +1,34 @@
 import { AttendanceRecord, Student, Teacher, ScheduledSession, DatabaseState, PayrollRecord, CourseSubject } from '../types';
 
+/**
+ * Normalizes Arabic text to handle spelling variations (e.g., أ/إ/آ -> ا, ة -> ه, ى -> ي),
+ * diacritics, and honorific prefixes (أستاذ/مستر/مس/مهندس) for robust matching.
+ */
+export function normalizeArabicName(name?: string | null): string {
+  if (!name) return '';
+  return String(name)
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/ئ/g, 'ي')
+    .replace(/ؤ/g, 'و')
+    .replace(/[\u064B-\u065F]/g, '') // Remove tashkeel/harakat
+    .replace(/^(أستاذة|استاذة|أستاذ|استاذ|أ\.|م\.|مستر|مس|مهندس|دكتور|د\.)\s*/, '')
+    .replace(/[\s_\-–—()]+/g, ' ')
+    .trim();
+}
+
+export function isArabicNameMatch(name1?: string | null, name2?: string | null): boolean {
+  if (!name1 || !name2) return false;
+  const n1 = normalizeArabicName(name1);
+  const n2 = normalizeArabicName(name2);
+  if (!n1 || !n2) return false;
+  if (n1 === n2) return true;
+  return n1.includes(n2) || n2.includes(n1);
+}
+
 export interface AccountingCycle {
   month: number; // 1-12
   year: number; // e.g. 2026
@@ -214,7 +243,9 @@ export function getTeacherCycleSessions(
   const end = cycle.endDate;
 
   const attCount = attendanceRecords.filter((a) => {
-    const isTeacher = a.teacherId === teacherId || (teacherObj && a.teacherNameAr === teacherObj.nameAr);
+    const isTeacher =
+      a.teacherId === teacherId ||
+      (teacherObj && (a.teacherNameAr === teacherObj.nameAr || isArabicNameMatch(a.teacherNameAr, teacherObj.nameAr)));
     if (!isTeacher) return false;
     if (a.status !== 'present' && a.status !== 'late') return false;
     const cleanDate = (a.date || '').split('T')[0];
@@ -222,9 +253,11 @@ export function getTeacherCycleSessions(
   });
 
   const sessCount = sessions.filter((s) => {
-    const isTeacher = s.teacherId === teacherId || (teacherObj && s.teacherNameAr === teacherObj.nameAr);
+    const isTeacher =
+      s.teacherId === teacherId ||
+      (teacherObj && (s.teacherNameAr === teacherObj.nameAr || isArabicNameMatch(s.teacherNameAr, teacherObj.nameAr)));
     if (!isTeacher || s.status !== 'completed') return false;
-    const cleanDate = (s.date || '').split('T')[0];
+    const cleanDate = (s.lastCompletedDate || s.completedAt || s.date || '').split('T')[0];
     return cleanDate >= start && cleanDate <= end;
   });
 
@@ -252,7 +285,9 @@ export function getTeacherPostCycleSessions(
   const end = cycle.endDate;
 
   const attCount = attendanceRecords.filter((a: any) => {
-    const isTeacher = a.teacherId === teacherId || (teacherObj && a.teacherNameAr === teacherObj.nameAr);
+    const isTeacher =
+      a.teacherId === teacherId ||
+      (teacherObj && (a.teacherNameAr === teacherObj.nameAr || isArabicNameMatch(a.teacherNameAr, teacherObj.nameAr)));
     if (!isTeacher) return false;
     if (a.status !== 'present' && a.status !== 'late') return false;
     const cleanDate = (a.date || '').split('T')[0];
@@ -261,9 +296,11 @@ export function getTeacherPostCycleSessions(
   });
 
   const sessCount = sessions.filter((s: any) => {
-    const isTeacher = s.teacherId === teacherId || (teacherObj && s.teacherNameAr === teacherObj.nameAr);
+    const isTeacher =
+      s.teacherId === teacherId ||
+      (teacherObj && (s.teacherNameAr === teacherObj.nameAr || isArabicNameMatch(s.teacherNameAr, teacherObj.nameAr)));
     if (!isTeacher || s.status !== 'completed') return false;
-    const cleanDate = (s.date || '').split('T')[0];
+    const cleanDate = (s.lastCompletedDate || s.completedAt || s.date || '').split('T')[0];
     if (s.teacherPaid) return false;
     return cleanDate > end;
   });

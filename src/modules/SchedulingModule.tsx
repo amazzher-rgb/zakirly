@@ -66,6 +66,12 @@ export const SchedulingModule: React.FC = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    details?: string;
+  } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({});
 
@@ -194,9 +200,90 @@ export const SchedulingModule: React.FC = () => {
     exportToExcel(exportData, 'جدول_الحصص_الأسبوعي_أكاديمية_ذاكرلي', 'جدول_الحصص');
   };
 
+  const handleComplete = async (session: any) => {
+    setCompletingId(session.id);
+    setActionFeedback(null);
+    try {
+      const res = await completeSession(
+        session.id,
+        'present',
+        `تم إكمال الحصة (${session.subjectNameAr || 'مادة تعليمية'}) وتسجيل الحضور`
+      );
+
+      if (res && res.success) {
+        setActionFeedback({
+          type: 'success',
+          message: `تم إكمال الحصة بنجاح!`,
+          details: res.message || `تم ترحيل الحصة لشيت الحضور والغياب، واحتساب الحصة للمعلم (${session.teacherNameAr})، وخصم حصة من رصيد الطالب (${session.studentNameAr}).`,
+        });
+        setTimeout(() => {
+          setActionFeedback(null);
+        }, 10000);
+      } else {
+        setActionFeedback({
+          type: 'error',
+          message: (res && res.message) || 'حدث خطأ أثناء إكمال الحصة',
+        });
+      }
+    } catch (err: any) {
+      setActionFeedback({
+        type: 'error',
+        message: err.message || 'حدث خطأ أثناء معالجة إكمال الحصة',
+      });
+    } finally {
+      setCompletingId(null);
+    }
+  };
+
+  const handleResetToScheduled = (session: any) => {
+    updateDatabaseState((draft) => {
+      const target = draft.sessions.find((s) => s.id === session.id);
+      if (target) {
+        target.status = 'scheduled';
+      }
+    });
+    setActionFeedback({
+      type: 'success',
+      message: `تم تجديد موعد الحصة للأسبوع القادم بنجاح!`,
+      details: `الحصة جاهزة للأسبوع القادم في نفس يومها وموعدها، وسجلات الحضور والغياب والمستحقات السابقة محفوظة دون تغيير.`,
+    });
+    setTimeout(() => {
+      setActionFeedback(null);
+    }, 6000);
+  };
+
   return (
     <div className="space-y-6">
       
+      {/* Action Notification Banner */}
+      {actionFeedback && (
+        <div
+          className={`p-4 rounded-2xl border flex items-start justify-between gap-3 shadow-md transition-all ${
+            actionFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+              : 'bg-rose-50 border-rose-300 text-rose-900'
+          }`}
+        >
+          <div className="flex items-start gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+            <div>
+              <h4 className="font-black text-xs sm:text-sm">{actionFeedback.message}</h4>
+              {actionFeedback.details && (
+                <p className="text-[11px] sm:text-xs text-emerald-800 mt-1 leading-relaxed">
+                  {actionFeedback.details}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setActionFeedback(null)}
+            className="text-emerald-700 hover:text-emerald-900 font-bold text-xs p-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div>
@@ -366,7 +453,9 @@ export const SchedulingModule: React.FC = () => {
                             key={session.id}
                             session={session}
                             onDelete={() => setDeletingSessionId(session.id)}
-                            onComplete={() => completeSession(session.id, 'present', 'تم الحضور بنجاح')}
+                            onComplete={() => handleComplete(session)}
+                            onResetSchedule={() => handleResetToScheduled(session)}
+                            isCompleting={completingId === session.id}
                           />
                         ))}
                       </div>
@@ -411,7 +500,9 @@ export const SchedulingModule: React.FC = () => {
                   key={session.id}
                   session={session}
                   onDelete={() => setDeletingSessionId(session.id)}
-                  onComplete={() => completeSession(session.id, 'present', 'تم الحضور بنجاح')}
+                  onComplete={() => handleComplete(session)}
+                  onResetSchedule={() => handleResetToScheduled(session)}
+                  isCompleting={completingId === session.id}
                 />
               ))}
             </div>
@@ -607,7 +698,9 @@ const SessionCard: React.FC<{
   session: any;
   onDelete: () => void;
   onComplete: () => void;
-}> = ({ session, onDelete, onComplete }) => {
+  onResetSchedule?: () => void;
+  isCompleting?: boolean;
+}> = ({ session, onDelete, onComplete, onResetSchedule, isCompleting }) => {
   const dayInfo = getSessionDay(session);
 
   return (
@@ -683,14 +776,41 @@ const SessionCard: React.FC<{
           <span className="text-slate-400 text-[9px] text-center">لا يوجد رابط</span>
         )}
 
-        {session.status === 'scheduled' && (
+        {session.status === 'scheduled' ? (
           <button
             onClick={onComplete}
-            className="py-1.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] sm:text-[11px] transition-colors flex items-center justify-center gap-1 shadow-sm"
+            disabled={isCompleting}
+            className="py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold text-[10px] sm:text-[11px] transition-all flex items-center justify-center gap-1 shadow-sm active:scale-95 cursor-pointer"
+            title="إكمال الحصة واحتسابها للمدرس وخصمها من حصص الطالب في شيت الحضور والغياب"
           >
-            <CheckCircle2 className="w-3 h-3" />
-            <span>إكمال</span>
+            {isCompleting ? (
+              <>
+                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>جاري الإكمال...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-3 h-3" />
+                <span>إكمال الحصة</span>
+              </>
+            )}
           </button>
+        ) : (
+          <div className="flex items-center gap-1">
+            <span className="py-1 px-1.5 rounded-lg bg-emerald-100 text-emerald-800 text-[9px] sm:text-[10px] font-extrabold flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              <span>محسوبة بالحضور</span>
+            </span>
+            {onResetSchedule && (
+              <button
+                onClick={onResetSchedule}
+                className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-[9px] sm:text-[10px] font-bold transition-colors border border-slate-200"
+                title="تجديد موعد الحصة للأسبوع القادم"
+              >
+                تجديد للأسبوع القادم
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

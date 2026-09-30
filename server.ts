@@ -365,29 +365,104 @@ async function startServer() {
       return res.status(404).json({ success: false, message: 'الحصة غير موجودة' });
     }
 
+    const todayDate = new Date().toISOString().split('T')[0];
+
     session.status = 'completed';
     session.completedAt = new Date().toISOString();
+    session.lastCompletedDate = todayDate;
     if (notes) session.notes = notes;
 
-    // Deduct student package remaining session
-    const student = db.students.find((s) => s.id === session.studentId);
+    const normArabic = (name?: string | null) => {
+      if (!name) return '';
+      return String(name)
+        .trim()
+        .toLowerCase()
+        .replace(/[أإآٱ]/g, 'ا')
+        .replace(/ة/g, 'ه')
+        .replace(/ى/g, 'ي')
+        .replace(/ئ/g, 'ي')
+        .replace(/ؤ/g, 'و')
+        .replace(/[\u064B-\u065F]/g, '')
+        .replace(/^(أستاذة|استاذة|أستاذ|استاذ|أ\.|م\.|مستر|مس|مهندس|دكتور|د\.)\s*/, '')
+        .replace(/[\s_\-–—()]+/g, ' ')
+        .trim();
+    };
+
+    const isMatch = (n1?: string | null, n2?: string | null) => {
+      const a = normArabic(n1);
+      const b = normArabic(n2);
+      if (!a || !b) return false;
+      return a === b || a.includes(b) || b.includes(a);
+    };
+
+    // 1. Resolve or Auto-Create Student
+    let student = db.students.find((s) => s.id === session.studentId);
+    if (!student && session.studentNameAr) {
+      student = db.students.find((s) => isMatch(s.nameAr, session.studentNameAr));
+    }
+    if (!student && session.studentNameAr) {
+      student = {
+        id: session.studentId || `stu-${Date.now()}`,
+        tenantId: session.tenantId || 'tenant-zakirly-curriculum',
+        code: `STU-${Math.floor(100 + Math.random() * 900)}`,
+        nameAr: session.studentNameAr,
+        nameEn: session.studentNameAr,
+        gender: 'male',
+        email: `student.${Date.now()}@zakirly.com`,
+        phone: '01000000000',
+        parentId: `par-${Date.now()}`,
+        parentNameAr: 'ولي أمر الطالب',
+        grade: 'مرحلة أساسية',
+        balance: 0,
+        enrolledCourseIds: [session.courseId || 'cs-101'],
+        totalSessionsCompleted: 0,
+        remainingSessions: 16,
+        status: 'active',
+        packageId: `sub-${Date.now()}`,
+        createdAt: todayDate,
+      };
+      db.students.unshift(student);
+    }
+
     let remainingSessionsAfter = 0;
     if (student) {
+      session.studentId = student.id;
+      session.studentNameAr = student.nameAr;
+
       if (student.remainingSessions > 0) {
         student.remainingSessions -= 1;
       }
-      student.totalSessionsCompleted += 1;
+      student.totalSessionsCompleted = (student.totalSessionsCompleted || 0) + 1;
       remainingSessionsAfter = student.remainingSessions;
 
       // Check subscription
-      const sub = db.subscriptions.find((sb) => sb.id === student.packageId || sb.studentId === student.id);
+      let sub = db.subscriptions.find((sb) => sb.studentId === student!.id || sb.id === student!.packageId);
+      if (!sub) {
+        sub = {
+          id: student.packageId || `sub-${Date.now()}`,
+          tenantId: session.tenantId || student.tenantId,
+          studentId: student.id,
+          studentNameAr: student.nameAr,
+          courseId: session.courseId || 'cs-101',
+          courseTitleAr: session.subjectNameAr || 'مادة تعليمية',
+          totalSessions: 16,
+          remainingSessions: 16,
+          status: 'active',
+          startDate: todayDate,
+          endDate: todayDate,
+          price: 3200,
+          paidAmount: 3200,
+          autoRenewal: false,
+        };
+        db.subscriptions.unshift(sub);
+      }
+
       if (sub) {
         if (sub.remainingSessions > 0) sub.remainingSessions -= 1;
         if (sub.remainingSessions <= 2) {
           sub.status = 'pending_renewal';
           student.status = 'pending_renewal';
 
-          // Trigger automated renewal notification!
           const notif: SystemNotification = {
             id: `ntf-${Date.now()}`,
             tenantId: session.tenantId,
@@ -406,39 +481,67 @@ async function startServer() {
       }
     }
 
-    // Increment Teacher Stats & Pay Record
-    const teacher = db.teachers.find((t) => t.id === session.teacherId);
-    if (teacher) {
-      teacher.completedSessionsCount += 1;
-      teacher.totalEarned += teacher.perSessionRate;
+    // 2. Resolve or Auto-Create Teacher
+    let teacher = db.teachers.find((t) => t.id === session.teacherId);
+    if (!teacher && session.teacherNameAr) {
+      teacher = db.teachers.find((t) => isMatch(t.nameAr, session.teacherNameAr));
+    }
+    if (!teacher && session.teacherNameAr) {
+      teacher = {
+        id: session.teacherId || `tch-${Date.now()}`,
+        tenantId: session.tenantId || 'tenant-zakirly-curriculum',
+        code: `TCH-${Math.floor(100 + Math.random() * 900)}`,
+        nameAr: session.teacherNameAr,
+        nameEn: session.teacherNameAr,
+        email: `teacher.${Date.now()}@zakirly.com`,
+        phone: '01100000000',
+        subjects: [session.subjectNameAr || 'مادة دراسية'],
+        languages: ['العربية'],
+        hourlyRate: 250,
+        perSessionRate: 250,
+        completedSessionsCount: 0,
+        totalEarned: 0,
+        rating: 5,
+        joinedDate: todayDate,
+        status: 'active',
+      };
+      db.teachers.unshift(teacher);
     }
 
-    // Record Attendance
+    if (teacher) {
+      session.teacherId = teacher.id;
+      session.teacherNameAr = teacher.nameAr;
+      teacher.completedSessionsCount = (teacher.completedSessionsCount || 0) + 1;
+      teacher.totalEarned = (teacher.totalEarned || 0) + (teacher.perSessionRate || 250);
+    }
+
+    // 3. Record in Attendance Sheet (date as YYYY-MM-DD so cycle & sheet detect it)
     const attRecord: AttendanceRecord = {
-      id: `att-${Date.now()}`,
-      tenantId: session.tenantId,
+      id: `att-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      tenantId: session.tenantId || (student ? student.tenantId : 'tenant-zakirly-curriculum'),
       sessionId: session.id,
-      studentId: session.studentId,
-      studentNameAr: session.studentNameAr,
-      teacherId: session.teacherId,
-      date: session.date,
+      studentId: student ? student.id : session.studentId,
+      studentNameAr: student ? student.nameAr : session.studentNameAr,
+      teacherId: teacher ? teacher.id : session.teacherId,
+      teacherNameAr: teacher ? teacher.nameAr : (session.teacherNameAr || 'المعلم'),
+      date: todayDate, // Real calendar date YYYY-MM-DD
       status: attendanceStatus || 'present',
-      notes: notes || 'تم إكمال الحصة وتسجيل الحضور آلياً',
-      loggedBy: performedBy || 'المعلم',
+      notes: notes || `تم إكمال الحصة (${session.subjectNameAr || 'مادة دراسية'}) وتسجيل الحضور آلياً`,
+      loggedBy: performedBy || 'المشرف الأكاديمي',
       timestamp: new Date().toISOString(),
     };
     db.attendance.unshift(attRecord);
 
-    // Audit Log
+    // 4. Audit Log
     const audit: AuditLog = {
       id: `log-${Date.now()}`,
       tenantId: session.tenantId,
-      userName: performedBy || 'المستخدم',
-      userRole: 'teacher',
-      actionAr: 'إكمال حصة دراسية وتحديث الحسابات',
-      actionEn: 'Completed Session & Updated Balances',
+      userName: performedBy || 'المشرف الأكاديمي',
+      userRole: 'academic_director',
+      actionAr: 'إكمال حصة دراسية وتسجيل الحضور واحتساب الأجر',
+      actionEn: 'Completed Session & Recorded Attendance',
       module: 'sessions',
-      details: `تم إكمال الحصة [${session.code}] للطالب ${session.studentNameAr} المتبقي (${remainingSessionsAfter} حصة).`,
+      details: `تم إكمال الحصة [${session.code}] للطالب ${session.studentNameAr} (المتبقي: ${remainingSessionsAfter} حصة)، واحتساب الحصة للمعلم ${session.teacherNameAr}.`,
       timestamp: new Date().toISOString(),
       ip: '127.0.0.1',
     };
@@ -451,12 +554,21 @@ async function startServer() {
       action: 'COMPLETE_SESSION',
       payload: { sessionId, studentId: session.studentId, remainingSessionsAfter, teacherId: session.teacherId },
       timestamp: new Date().toISOString(),
-      performedBy: performedBy || 'المدرس',
+      performedBy: performedBy || 'المشرف الأكاديمي',
     };
     broadcastRealtime(event);
     savePersistentDb(db);
 
-    res.json({ success: true, session, student, teacher, db, kpis: calculateKPIs(db) });
+    res.json({
+      success: true,
+      message: `تم إكمال الحصة بنجاح! تم احتساب الحصة للمعلم (${session.teacherNameAr}) وخصم حصة من رصيد الطالب (${session.studentNameAr}) (المتبقي: ${remainingSessionsAfter} حصة).`,
+      session,
+      student,
+      teacher,
+      attendanceRecord: attRecord,
+      db,
+      kpis: calculateKPIs(db),
+    });
   });
 
   // 2. Process Payment Workflow

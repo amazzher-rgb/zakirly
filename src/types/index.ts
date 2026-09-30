@@ -168,6 +168,7 @@ export interface ScheduledSession {
   roomName?: string;
   notes?: string;
   completedAt?: string;
+  lastCompletedDate?: string;
   teacherPaid: boolean;
 }
 

@@ -11,7 +11,7 @@ import {
 } from '../types';
 import { initialDatabaseState } from '../data/initialData';
 import { getCurrencySymbol } from '../utils/currencyUtils';
-import { getAccountingCycle, getCurrentAccountingCycle, AccountingCycle, getTeacherCycleSessions, getTeacherPostCycleSessions } from '../utils/accountingUtils';
+import { getAccountingCycle, getCurrentAccountingCycle, AccountingCycle, getTeacherCycleSessions, getTeacherPostCycleSessions, normalizeArabicName, isArabicNameMatch } from '../utils/accountingUtils';
 import {
   savePermanentState,
   loadPermanentState,
@@ -998,7 +998,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         notes,
         performedBy: ROLE_DEFINITIONS[role].titleAr,
       });
-      if (res.success && res.db) {
+      if (res && res.success && res.db) {
         setDb(res.db);
         if (res.kpis) setKpis(res.kpis);
         savePermanentState(res.db);
@@ -1008,48 +1008,144 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (e) {}
 
     // Local fallback execution
+    let completionResult: any = { success: true };
+    const todayDate = new Date().toISOString().split('T')[0];
+
     updateDatabaseState((draft) => {
       const sess = draft.sessions.find((s: any) => s.id === sessionId);
       if (sess) {
         sess.status = 'completed';
         sess.completedAt = new Date().toISOString();
+        sess.lastCompletedDate = todayDate;
         
-        const student = draft.students.find((s: any) => s.id === sess.studentId);
+        // 1. Resolve or Auto-Create Student
+        let student = draft.students.find((s: any) => s.id === sess.studentId);
+        if (!student && sess.studentNameAr) {
+          student = draft.students.find((s: any) => isArabicNameMatch(s.nameAr, sess.studentNameAr));
+        }
+        if (!student && sess.studentNameAr) {
+          student = {
+            id: sess.studentId || `stu-${Date.now()}`,
+            tenantId: sess.tenantId || activeTenantId,
+            code: `STU-${Math.floor(100 + Math.random() * 900)}`,
+            nameAr: sess.studentNameAr,
+            nameEn: sess.studentNameAr,
+            gender: 'male',
+            email: `student.${Date.now()}@zakirly.com`,
+            phone: '01000000000',
+            parentId: `par-${Date.now()}`,
+            parentNameAr: 'ولي أمر الطالب',
+            grade: 'مرحلة أساسية',
+            balance: 0,
+            enrolledCourseIds: [sess.courseId || 'cs-101'],
+            totalSessionsCompleted: 0,
+            remainingSessions: 16,
+            status: 'active',
+            packageId: `sub-${Date.now()}`,
+            createdAt: todayDate,
+          };
+          draft.students.unshift(student);
+        }
+
+        let remainingSessionsAfter = 0;
         if (student) {
-          if (student.remainingSessions > 0) student.remainingSessions -= 1;
+          sess.studentId = student.id;
+          sess.studentNameAr = student.nameAr;
+
+          if (student.remainingSessions > 0) {
+            student.remainingSessions -= 1;
+          }
           student.totalSessionsCompleted = (student.totalSessionsCompleted || 0) + 1;
+          remainingSessionsAfter = student.remainingSessions;
+
+          let sub = draft.subscriptions.find((sb: any) => sb.studentId === student!.id || sb.id === student!.packageId);
+          if (!sub) {
+            sub = {
+              id: student.packageId || `sub-${Date.now()}`,
+              tenantId: sess.tenantId || student.tenantId,
+              studentId: student.id,
+              studentNameAr: student.nameAr,
+              courseId: sess.courseId || 'cs-101',
+              courseTitleAr: sess.subjectNameAr || 'مادة تعليمية',
+              totalSessions: 16,
+              remainingSessions: 16,
+              status: 'active',
+              startDate: todayDate,
+              endDate: todayDate,
+              price: 3200,
+              paidAmount: 3200,
+              autoRenewal: false,
+            };
+            draft.subscriptions.unshift(sub);
+          }
+
+          if (sub) {
+            if (sub.remainingSessions > 0) sub.remainingSessions -= 1;
+          }
         }
 
-        const sub = draft.subscriptions.find((sb: any) => sb.studentId === sess.studentId || sb.id === student?.packageId);
-        if (sub && sub.remainingSessions > 0) {
-          sub.remainingSessions -= 1;
+        // 2. Resolve or Auto-Create Teacher
+        let teacher = draft.teachers.find((t: any) => t.id === sess.teacherId);
+        if (!teacher && sess.teacherNameAr) {
+          teacher = draft.teachers.find((t: any) => isArabicNameMatch(t.nameAr, sess.teacherNameAr));
+        }
+        if (!teacher && sess.teacherNameAr) {
+          teacher = {
+            id: sess.teacherId || `tch-${Date.now()}`,
+            tenantId: sess.tenantId || activeTenantId,
+            code: `TCH-${Math.floor(100 + Math.random() * 900)}`,
+            nameAr: sess.teacherNameAr,
+            nameEn: sess.teacherNameAr,
+            email: `teacher.${Date.now()}@zakirly.com`,
+            phone: '01100000000',
+            subjects: [sess.subjectNameAr || 'مادة دراسية'],
+            languages: ['العربية'],
+            hourlyRate: 250,
+            perSessionRate: 250,
+            completedSessionsCount: 0,
+            totalEarned: 0,
+            rating: 5,
+            joinedDate: todayDate,
+            status: 'active',
+          };
+          draft.teachers.unshift(teacher);
         }
 
-        const teacher = draft.teachers.find((t: any) => t.id === sess.teacherId);
         if (teacher) {
+          sess.teacherId = teacher.id;
+          sess.teacherNameAr = teacher.nameAr;
           teacher.completedSessionsCount = (teacher.completedSessionsCount || 0) + 1;
           teacher.totalEarned = (teacher.totalEarned || 0) + (teacher.perSessionRate || 250);
         }
 
+        // 3. Record Attendance in db.attendance (with real calendar date YYYY-MM-DD)
         const attRecord = {
-          id: `att-${Date.now()}`,
-          tenantId: sess.tenantId,
+          id: `att-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          tenantId: sess.tenantId || activeTenantId,
           sessionId: sess.id,
-          studentId: sess.studentId,
-          studentNameAr: sess.studentNameAr,
-          teacherId: sess.teacherId,
-          teacherNameAr: sess.teacherNameAr || teacher?.nameAr || 'المعلم',
-          date: sess.date,
+          studentId: student ? student.id : sess.studentId,
+          studentNameAr: student ? student.nameAr : sess.studentNameAr,
+          teacherId: teacher ? teacher.id : sess.teacherId,
+          teacherNameAr: teacher ? teacher.nameAr : (sess.teacherNameAr || 'المعلم'),
+          date: todayDate, // Real calendar date YYYY-MM-DD
           status: (attendanceStatus || 'present') as any,
-          notes: notes || 'تم إكمال الحصة وتسجيل الحضور آلياً',
-          loggedBy: ROLE_DEFINITIONS[role]?.titleAr || 'المعلم',
+          notes: notes || `تم إكمال الحصة (${sess.subjectNameAr || 'مادة دراسية'}) وتسجيل الحضور آلياً`,
+          loggedBy: ROLE_DEFINITIONS[role]?.titleAr || 'المشرف الأكاديمي',
           timestamp: new Date().toISOString(),
         };
         draft.attendance.unshift(attRecord);
+
+        completionResult = {
+          success: true,
+          message: `تم إكمال الحصة بنجاح! تم احتساب الحصة للمعلم (${sess.teacherNameAr}) وخصم حصة من رصيد الطالب (${sess.studentNameAr}) (المتبقي: ${remainingSessionsAfter} حصة).`,
+          studentName: sess.studentNameAr,
+          teacherName: sess.teacherNameAr,
+          remainingSessions: remainingSessionsAfter,
+        };
       }
     });
 
-    return { success: true };
+    return completionResult;
   };
 
   const processPayment = async (invoiceId: string, amount: number, method?: string, notes?: string) => {
