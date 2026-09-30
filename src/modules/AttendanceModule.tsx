@@ -24,6 +24,7 @@ import {
   isDateInAccountingCycle,
   getAccountingCycleForDate,
   parseLocalDate,
+  isArabicNameMatch,
 } from '../utils/accountingUtils';
 
 export const AttendanceModule: React.FC = () => {
@@ -187,6 +188,34 @@ export const AttendanceModule: React.FC = () => {
     updateDatabaseState((draft) => {
       const idx = draft.attendance.findIndex((a) => a.id === id);
       if (idx !== -1) {
+        const removed = draft.attendance[idx];
+        if (removed.status === 'present' || removed.status === 'late') {
+          const st = draft.students.find(
+            (s) => s.id === removed.studentId || (removed.studentNameAr && isArabicNameMatch(s.nameAr, removed.studentNameAr))
+          );
+          if (st) {
+            st.remainingSessions = (st.remainingSessions ?? 0) + 1;
+            st.totalSessionsCompleted = Math.max(0, (st.totalSessionsCompleted || 0) - 1);
+            if (st.remainingSessions > 0 && st.status === 'pending_renewal') {
+              st.status = 'active';
+            }
+          }
+          const sub = draft.subscriptions.find((sb) => sb.studentId === removed.studentId);
+          if (sub) {
+            sub.remainingSessions = (sub.remainingSessions ?? 0) + 1;
+            if (sub.remainingSessions > 0 && sub.status === 'pending_renewal') {
+              sub.status = 'active';
+            }
+          }
+          const tch = draft.teachers.find(
+            (t) => t.id === removed.teacherId || (removed.teacherNameAr && isArabicNameMatch(t.nameAr, removed.teacherNameAr))
+          );
+          if (tch) {
+            tch.completedSessionsCount = Math.max(0, (tch.completedSessionsCount || 0) - 1);
+            const rate = tch.perSessionRate || tch.hourlyRate || 250;
+            tch.totalEarned = Math.max(0, (tch.totalEarned || 0) - rate);
+          }
+        }
         draft.attendance.splice(idx, 1);
       }
     });
@@ -474,43 +503,70 @@ export const AttendanceModule: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
-                              {group.records.map((att) => (
-                                <tr key={att.id} className="hover:bg-slate-50 transition-colors">
-                                  <td className="p-3 font-extrabold text-slate-900">{att.studentNameAr}</td>
-                                  <td className="p-3 font-bold text-emerald-800 flex items-center gap-1.5">
-                                    <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                    <span>{att.teacherNameAr || 'معلم المادة'}</span>
-                                  </td>
-                                  <td className="p-3 text-slate-600">{att.loggedBy}</td>
-                                  <td className="p-3 text-center">
-                                    <span
-                                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                        att.status === 'present'
-                                          ? 'bg-emerald-100 text-emerald-800'
+                              {group.records.map((att) => {
+                                const st = db.students.find(
+                                  (s) => s.id === att.studentId || (att.studentNameAr && isArabicNameMatch(s.nameAr, att.studentNameAr))
+                                );
+                                const isNeg = st && typeof st.remainingSessions === 'number' && st.remainingSessions < 0;
+
+                                return (
+                                  <tr key={att.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="p-3">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="font-extrabold text-slate-900">{att.studentNameAr}</span>
+                                        {st && (
+                                          <span
+                                            className={`px-1.5 py-0.5 rounded text-[9px] font-black ${
+                                              isNeg
+                                                ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                                : st.remainingSessions <= 2
+                                                ? 'bg-amber-100 text-amber-800'
+                                                : 'bg-blue-50 text-blue-700'
+                                            }`}
+                                            title={isNeg ? 'حضر حصصاً دون تجديد الباقة' : undefined}
+                                          >
+                                            {isNeg
+                                              ? `بالسالب (${st.remainingSessions}) ⚠️`
+                                              : `متبقي ${st.remainingSessions}`}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-3 font-bold text-emerald-800 flex items-center gap-1.5">
+                                      <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                      <span>{att.teacherNameAr || 'معلم المادة'}</span>
+                                    </td>
+                                    <td className="p-3 text-slate-600">{att.loggedBy}</td>
+                                    <td className="p-3 text-center">
+                                      <span
+                                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                          att.status === 'present'
+                                            ? 'bg-emerald-100 text-emerald-800'
+                                            : att.status === 'late'
+                                            ? 'bg-amber-100 text-amber-800'
+                                            : 'bg-rose-100 text-rose-800'
+                                        }`}
+                                      >
+                                        {att.status === 'present'
+                                          ? 'حاضر ومكتمل'
                                           : att.status === 'late'
-                                          ? 'bg-amber-100 text-amber-800'
-                                          : 'bg-rose-100 text-rose-800'
-                                      }`}
-                                    >
-                                      {att.status === 'present'
-                                        ? 'حاضر ومكتمل'
-                                        : att.status === 'late'
-                                        ? 'متأخر'
-                                        : 'غائب'}
-                                    </span>
-                                  </td>
-                                  <td className="p-3 text-slate-500 text-[11px]">{att.notes || 'لا يوجد ملاحظات'}</td>
-                                  <td className="p-3 text-center">
-                                    <button
-                                      onClick={() => setDeletingId(att.id)}
-                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                      title="حذف السجل"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
+                                          ? 'متأخر'
+                                          : 'غائب'}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-slate-500 text-[11px]">{att.notes || 'لا يوجد ملاحظات'}</td>
+                                    <td className="p-3 text-center">
+                                      <button
+                                        onClick={() => setDeletingId(att.id)}
+                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                        title="حذف السجل"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>

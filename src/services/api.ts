@@ -238,6 +238,7 @@ export async function completeSessionWorkflow(payload: {
   attendanceStatus?: string;
   notes?: string;
   performedBy?: string;
+  sessionData?: any;
 }) {
   if (isStaticDeployment()) throw new Error('Static deployment');
   const base = getApiBaseUrl();

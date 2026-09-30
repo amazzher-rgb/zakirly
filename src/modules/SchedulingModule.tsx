@@ -5,6 +5,7 @@ import { ExcelImportModal } from '../components/ExcelImportModal';
 import { exportToExcel } from '../utils/excelExporter';
 import { formatTime12H } from '../utils/timeUtils';
 import { Time12HPicker } from '../components/Time12HPicker';
+import { isArabicNameMatch } from '../utils/accountingUtils';
 
 export const WEEK_DAYS = [
   { id: 'all', nameAr: 'جميع الأيام', dayNum: -1 },
@@ -158,6 +159,17 @@ export const SchedulingModule: React.FC = () => {
 
     if (res && res.success) {
       setIsAddOpen(false);
+      // Auto-switch to scheduled day if currently in single day view, and ensure accordion is expanded
+      if (selectedDayTab !== 'all' && selectedDayTab !== dayObj.id) {
+        setSelectedDayTab(dayObj.id);
+      }
+      setCollapsedDays((prev) => ({ ...prev, [dayObj.id]: false }));
+      setActionFeedback({
+        type: 'success',
+        message: 'تمت جدولة الحصة بنجاح!',
+        details: `تمت جدولة الحصة ليوم ${dayObj.nameAr} (${formatTime12H(startTime)}) مع المعلم (${selectedTeacher.nameAr}) والطالب (${selectedStudent.nameAr}). تظهر الحصة الآن في الجدول الأسبوعي.`,
+      });
+      setTimeout(() => setActionFeedback(null), 8000);
     } else {
       setErrorMsg((res && res.message) || 'خطأ في جدولة الحصة');
     }
@@ -207,7 +219,8 @@ export const SchedulingModule: React.FC = () => {
       const res = await completeSession(
         session.id,
         'present',
-        `تم إكمال الحصة (${session.subjectNameAr || 'مادة تعليمية'}) وتسجيل الحضور`
+        `تم إكمال الحصة (${session.subjectNameAr || 'مادة تعليمية'}) وتسجيل الحضور`,
+        session
       );
 
       if (res && res.success) {
@@ -320,7 +333,7 @@ export const SchedulingModule: React.FC = () => {
           </button>
 
           <button
-            onClick={() => openAddModalForDay('saturday')}
+            onClick={() => openAddModalForDay(selectedDayTab !== 'all' ? selectedDayTab : 'saturday')}
             className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
@@ -512,159 +525,193 @@ export const SchedulingModule: React.FC = () => {
 
       {/* Add Session Modal */}
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <form onSubmit={handleCreate} className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <h3 className="font-extrabold text-slate-900 text-base">جدولة حصة جديدة (Microsoft Teams)</h3>
-                <p className="text-[11px] text-slate-500">حصة أسبوعية مرتبطة باليوم المحدد وتبقى ثابتة فيه</p>
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-slate-50/80 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0">
+                  <CalendarDays className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">جدولة حصة جديدة (Microsoft Teams)</h3>
+                  <p className="text-[11px] text-slate-500">حصة أسبوعية ترتبط باليوم المحدد، وتُحسب للمعلم وتُخصم من رصيد الطالب</p>
+                </div>
               </div>
-              <button type="button" onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsAddOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {errorMsg && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
+            <form onSubmit={handleCreate} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+                {errorMsg && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">اختر المعلم*</label>
-                <select
-                  value={teacherId}
-                  onChange={(e) => setTeacherId(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl font-bold"
-                >
-                  {db.teachers.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.nameAr} ({Array.isArray(t.subjects) ? t.subjects.join(', ') : t.subjects || 'عام'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">اختر الطالب*</label>
-                <select
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl font-bold"
-                >
-                  {db.students.map((s) => (
-                    <option key={s.id} value={s.id}>{s.nameAr} (متبقي {s.remainingSessions} حصة)</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">المادة الكورس*</label>
-                <select
-                  value={courseId}
-                  onChange={(e) => setCourseId(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl font-bold"
-                >
-                  {db.courseSubjects.map((c) => (
-                    <option key={c.id} value={c.id}>{c.titleAr}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Day of Week Selection (NOT calendar date) */}
-              <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-slate-800 font-extrabold text-xs">
-                    يوم الحصة من أيام الأسبوع*
-                  </label>
-                  <span className="text-[10px] text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-md font-bold">
-                    ثابت أسبوعياً
-                  </span>
-                </div>
-
-                {/* Quick Selection Buttons for Weekdays */}
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1">
-                  {WEEK_DAYS.filter((w) => w.id !== 'all').map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => setSelectedDayId(d.id)}
-                      className={`py-1.5 px-0.5 rounded-xl text-[11px] font-extrabold transition-all text-center border ${
-                        selectedDayId === d.id
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
+                {/* Row 1: Teacher & Student */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">اختر المعلم*</label>
+                    <select
+                      value={teacherId}
+                      onChange={(e) => setTeacherId(e.target.value)}
+                      className="w-full border border-slate-200 p-2.5 rounded-xl font-bold bg-white text-slate-800"
                     >
-                      {d.nameAr}
-                    </button>
-                  ))}
+                      {db.teachers.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.nameAr} ({Array.isArray(t.subjects) ? t.subjects.join(', ') : t.subjects || 'عام'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">اختر الطالب*</label>
+                    <select
+                      value={studentId}
+                      onChange={(e) => setStudentId(e.target.value)}
+                      className="w-full border border-slate-200 p-2.5 rounded-xl font-bold bg-white text-slate-800"
+                    >
+                      {db.students.map((s) => {
+                        const isNeg = s.remainingSessions < 0;
+                        return (
+                          <option key={s.id} value={s.id}>
+                            {s.nameAr} ({isNeg ? `رصيد سالب: ${s.remainingSessions} حصة (غير مجدد ⚠️)` : `متبقي ${s.remainingSessions} حصة`})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
                 </div>
 
-                {/* Dropdown for explicit selection */}
-                <select
-                  value={selectedDayId}
-                  onChange={(e) => setSelectedDayId(e.target.value)}
-                  className="w-full border border-slate-200 p-2 rounded-xl font-extrabold bg-white text-slate-800 text-xs"
-                  required
-                >
-                  {WEEK_DAYS.filter((w) => w.id !== 'all').map((d) => (
-                    <option key={d.id} value={d.id}>
-                      يوم {d.nameAr} (ثابت أسبوعياً)
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-slate-500">
-                  الحصة غير مرتبطة بتاريخ ميلادي؛ ستبقى موجودة أسبوعياً في يوم {WEEK_DAYS.find((w) => w.id === selectedDayId)?.nameAr}.
-                </p>
-              </div>
+                {/* Row 2: Course & Duration */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">المادة / الكورس*</label>
+                    <select
+                      value={courseId}
+                      onChange={(e) => setCourseId(e.target.value)}
+                      className="w-full border border-slate-200 p-2.5 rounded-xl font-bold bg-white text-slate-800"
+                    >
+                      {db.courseSubjects.map((c) => (
+                        <option key={c.id} value={c.id}>{c.titleAr}</option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* Duration */}
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">مدة الحصة*</label>
-                <select
-                  value={durationMinutes}
-                  onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl font-bold text-xs bg-white"
-                >
-                  <option value={30}>30 دقيقة (نصف ساعة)</option>
-                  <option value={45}>45 دقيقة</option>
-                  <option value={60}>60 دقيقة (ساعة كاملة)</option>
-                  <option value={90}>90 دقيقة (ساعة ونصف)</option>
-                  <option value={120}>120 دقيقة (ساعتان)</option>
-                </select>
-              </div>
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">مدة الحصة*</label>
+                    <select
+                      value={durationMinutes}
+                      onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                      className="w-full border border-slate-200 p-2.5 rounded-xl font-bold bg-white text-slate-800"
+                    >
+                      <option value={30}>30 دقيقة (نصف ساعة)</option>
+                      <option value={45}>45 دقيقة</option>
+                      <option value={60}>60 دقيقة (ساعة كاملة)</option>
+                      <option value={90}>90 دقيقة (ساعة ونصف)</option>
+                      <option value={120}>120 دقيقة (ساعتان)</option>
+                    </select>
+                  </div>
+                </div>
 
-              {/* 12-Hour Time Picker */}
-              <Time12HPicker
-                value={startTime}
-                onChange={setStartTime}
-                durationMinutes={durationMinutes}
-                label="موعد الحصة (توقيت 12 ساعة)"
-              />
+                {/* Day of Week Selection */}
+                <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-100 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-slate-800 font-extrabold text-xs">
+                      يوم الحصة من أيام الأسبوع*
+                    </label>
+                    <span className="text-[10px] text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md font-bold">
+                      ثابت أسبوعياً في الجدول
+                    </span>
+                  </div>
 
-              <div>
-                <label className="block text-slate-700 font-bold mb-1 flex items-center justify-between">
-                  <span>رابط اجتماع Microsoft Teams</span>
-                  <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-extrabold">تلقائي تيمز</span>
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://teams.microsoft.com/l/meetup-join/..."
-                  value={customTeamsLink}
-                  onChange={(e) => setCustomTeamsLink(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl font-mono text-[11px]"
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                    {WEEK_DAYS.filter((w) => w.id !== 'all').map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => setSelectedDayId(d.id)}
+                        className={`py-2 px-1 rounded-xl text-[11px] font-extrabold transition-all text-center border ${
+                          selectedDayId === d.id
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-300'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {d.nameAr}
+                      </button>
+                    ))}
+                  </div>
+
+                  <select
+                    value={selectedDayId}
+                    onChange={(e) => setSelectedDayId(e.target.value)}
+                    className="w-full border border-slate-200 p-2 rounded-xl font-extrabold bg-white text-slate-800 text-xs"
+                    required
+                  >
+                    {WEEK_DAYS.filter((w) => w.id !== 'all').map((d) => (
+                      <option key={d.id} value={d.id}>
+                        يوم {d.nameAr} (ثابت أسبوعياً)
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500">
+                    الحصة غير مقيدة بتاريخ ميلادي محدد؛ ستبقى موجودة ومتاحة أسبوعياً في يوم {WEEK_DAYS.find((w) => w.id === selectedDayId)?.nameAr}.
+                  </p>
+                </div>
+
+                {/* 12-Hour Time Picker */}
+                <Time12HPicker
+                  value={startTime}
+                  onChange={setStartTime}
+                  durationMinutes={durationMinutes}
+                  label="موعد الحصة (توقيت 12 ساعة)"
                 />
-                <p className="text-[10px] text-slate-500 mt-1">اتركه فارغاً ليتم توليد رابط Microsoft Teams تلقائياً للحصة.</p>
-              </div>
-            </div>
 
-            <div className="pt-3 border-t flex justify-end gap-2 text-xs font-bold">
-              <button type="button" onClick={() => setIsAddOpen(false)} className="px-4 py-2 border rounded-xl">إلغاء</button>
-              <button type="submit" className="px-5 py-2 bg-blue-600 text-white rounded-xl shadow-md">حفظ وجدولة الحصة</button>
-            </div>
-          </form>
+                {/* Microsoft Teams Link */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1 flex items-center justify-between">
+                    <span>رابط اجتماع Microsoft Teams</span>
+                    <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-extrabold">توليد آلي إن ترك فارغاً</span>
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://teams.microsoft.com/l/meetup-join/..."
+                    value={customTeamsLink}
+                    onChange={(e) => setCustomTeamsLink(e.target.value)}
+                    className="w-full border border-slate-200 p-2.5 rounded-xl font-mono text-[11px] bg-white"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">اتركه فارغاً ليتم توليد رابط Microsoft Teams تلقائياً للحصة مع زر الانضمام المباشر.</p>
+                </div>
+              </div>
+
+              {/* Fixed Footer Buttons */}
+              <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/90 flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAddOpen(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-xl font-bold text-xs transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>حفظ وجدولة الحصة</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -701,7 +748,15 @@ const SessionCard: React.FC<{
   onResetSchedule?: () => void;
   isCompleting?: boolean;
 }> = ({ session, onDelete, onComplete, onResetSchedule, isCompleting }) => {
+  const { db } = useApp();
   const dayInfo = getSessionDay(session);
+
+  // Find linked student
+  const student = db.students.find(
+    (s) => s.id === session.studentId || (session.studentNameAr && isArabicNameMatch(s.nameAr, session.studentNameAr))
+  );
+
+  const isStudentNegative = student && typeof student.remainingSessions === 'number' && student.remainingSessions < 0;
 
   return (
     <div
@@ -728,7 +783,7 @@ const SessionCard: React.FC<{
                   : 'bg-amber-100 text-amber-800'
               }`}
             >
-              {session.status === 'completed' ? 'مكتملة' : 'مجدولة'}
+              {session.status === 'completed' ? 'مكتملة ومسجلة' : 'مجدولة'}
             </span>
 
             <button
@@ -741,7 +796,7 @@ const SessionCard: React.FC<{
           </div>
         </div>
 
-        <div className="space-y-1 text-[10px] sm:text-xs text-slate-700 bg-slate-50 p-2 rounded-xl border border-slate-100">
+        <div className="space-y-1.5 text-[10px] sm:text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
           <div className="flex items-center justify-between font-mono">
             <span className="text-slate-400 text-[9px] sm:text-[10px]">الموعد:</span>
             <span className="font-bold text-blue-800 text-[10px] sm:text-xs">
@@ -749,9 +804,27 @@ const SessionCard: React.FC<{
             </span>
           </div>
 
-          <div className="flex items-center justify-between truncate">
-            <span className="text-slate-400 text-[9px] sm:text-[10px] shrink-0 ml-1">الطالب:</span>
-            <span className="font-bold truncate">{session.studentNameAr}</span>
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-slate-400 text-[9px] sm:text-[10px] shrink-0">الطالب:</span>
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="font-bold truncate text-slate-900">{session.studentNameAr}</span>
+              {student && (
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[9px] font-black shrink-0 ${
+                    isStudentNegative
+                      ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                      : student.remainingSessions <= 2
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-blue-50 text-blue-700'
+                  }`}
+                  title={isStudentNegative ? 'رصيد الحصص بالسالب - اشتراك غير مجدد' : undefined}
+                >
+                  {isStudentNegative
+                    ? `بالسالب (${student.remainingSessions}) ⚠️`
+                    : `متبقي ${student.remainingSessions}`}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center justify-between truncate">
@@ -781,7 +854,7 @@ const SessionCard: React.FC<{
             onClick={onComplete}
             disabled={isCompleting}
             className="py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold text-[10px] sm:text-[11px] transition-all flex items-center justify-center gap-1 shadow-sm active:scale-95 cursor-pointer"
-            title="إكمال الحصة واحتسابها للمدرس وخصمها من حصص الطالب في شيت الحضور والغياب"
+            title="إكمال الحصة واحتسابها للمدرس وخصمها من حصص الطالب وترحيلها لشيت الحضور والغياب"
           >
             {isCompleting ? (
               <>

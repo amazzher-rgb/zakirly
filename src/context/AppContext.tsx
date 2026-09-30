@@ -183,7 +183,7 @@ interface AppContextType {
   setCustomCycleDates: (startDate: string, endDate: string) => void;
   
   // Workflows
-  completeSession: (sessionId: string, attendanceStatus?: string, notes?: string) => Promise<any>;
+  completeSession: (sessionId: string, attendanceStatus?: string, notes?: string, sessionData?: any) => Promise<any>;
   processPayment: (invoiceId: string, amount: number, method?: string, notes?: string) => Promise<any>;
   convertTrial: (trialId: string, packageCourseId?: string, totalSessions?: number, price?: number, paidAmount?: number, currency?: string) => Promise<any>;
   runPayroll: (month: number, year: number) => Promise<any>;
@@ -990,13 +990,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [lang]);
 
   // Action Dispatchers
-  const completeSession = async (sessionId: string, attendanceStatus?: string, notes?: string) => {
+  const completeSession = async (sessionId: string, attendanceStatus?: string, notes?: string, sessionData?: any) => {
+    const currentSess = sessionData || db.sessions.find((s) => s.id === sessionId);
+
     try {
       const res = await completeSessionWorkflow({
         sessionId,
         attendanceStatus,
         notes,
-        performedBy: ROLE_DEFINITIONS[role].titleAr,
+        performedBy: ROLE_DEFINITIONS[role]?.titleAr || 'المشرف الأكاديمي',
+        sessionData: currentSess,
       });
       if (res && res.success && res.db) {
         setDb(res.db);
@@ -1005,14 +1008,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         saveDirectToNeon(res.db).catch(() => {});
         return res;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('API error in completeSession, fallback to client execution', e);
+    }
 
     // Local fallback execution
     let completionResult: any = { success: true };
     const todayDate = new Date().toISOString().split('T')[0];
 
     updateDatabaseState((draft) => {
-      const sess = draft.sessions.find((s: any) => s.id === sessionId);
+      let sess = draft.sessions.find((s: any) => s.id === sessionId);
+      if (!sess && currentSess) {
+        sess = {
+          ...currentSess,
+          id: currentSess.id || sessionId,
+        };
+        draft.sessions.unshift(sess);
+      }
+
       if (sess) {
         sess.status = 'completed';
         sess.completedAt = new Date().toISOString();
@@ -1039,8 +1052,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             balance: 0,
             enrolledCourseIds: [sess.courseId || 'cs-101'],
             totalSessionsCompleted: 0,
-            remainingSessions: 16,
-            status: 'active',
+            remainingSessions: 0,
+            status: 'pending_renewal',
             packageId: `sub-${Date.now()}`,
             createdAt: todayDate,
           };
@@ -1052,7 +1065,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           sess.studentId = student.id;
           sess.studentNameAr = student.nameAr;
 
-          student.remainingSessions = (student.remainingSessions ?? 0) - 1;
+          // Deduct 1 session from student - CAN GO NEGATIVE if unrenewed!
+          const currentRem = typeof student.remainingSessions === 'number' ? student.remainingSessions : 0;
+          student.remainingSessions = currentRem - 1;
           student.totalSessionsCompleted = (student.totalSessionsCompleted || 0) + 1;
           remainingSessionsAfter = student.remainingSessions;
           if (student.remainingSessions <= 0) {
@@ -1068,20 +1083,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               studentNameAr: student.nameAr,
               courseId: sess.courseId || 'cs-101',
               courseTitleAr: sess.subjectNameAr || 'مادة تعليمية',
-              totalSessions: 16,
-              remainingSessions: 16,
-              status: 'active',
+              totalSessions: Math.max(1, student.totalSessionsCompleted || 1),
+              remainingSessions: student.remainingSessions,
+              status: 'pending_renewal',
               startDate: todayDate,
               endDate: todayDate,
               price: 3200,
-              paidAmount: 3200,
+              paidAmount: 0,
               autoRenewal: false,
             };
             draft.subscriptions.unshift(sub);
-          }
-
-          if (sub) {
-            sub.remainingSessions = (sub.remainingSessions ?? 0) - 1;
+          } else {
+            const currentSubRem = typeof sub.remainingSessions === 'number' ? sub.remainingSessions : 0;
+            sub.remainingSessions = currentSubRem - 1;
             if (sub.remainingSessions <= 0) {
               sub.status = 'pending_renewal';
             }
@@ -1119,7 +1133,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           sess.teacherId = teacher.id;
           sess.teacherNameAr = teacher.nameAr;
           teacher.completedSessionsCount = (teacher.completedSessionsCount || 0) + 1;
-          teacher.totalEarned = (teacher.totalEarned || 0) + (teacher.perSessionRate || 250);
+          const rate = teacher.perSessionRate || teacher.hourlyRate || 250;
+          teacher.totalEarned = (teacher.totalEarned || 0) + rate;
         }
 
         // 3. Record Attendance in db.attendance (with real calendar date YYYY-MM-DD)
@@ -1139,9 +1154,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
         draft.attendance.unshift(attRecord);
 
+        const isNegative = remainingSessionsAfter < 0;
+        const studentMsg = isNegative
+          ? `ورصيد الطالب (${sess.studentNameAr}) أصبح بالسالب (${remainingSessionsAfter} حصة - اشتراك غير مجدد ⚠️)`
+          : `وخصم حصة من رصيد الطالب (${sess.studentNameAr}) (المتبقي: ${remainingSessionsAfter} حصة)`;
+
         completionResult = {
           success: true,
-          message: `تم إكمال الحصة بنجاح! تم احتساب الحصة للمعلم (${sess.teacherNameAr}) وخصم حصة من رصيد الطالب (${sess.studentNameAr}) (المتبقي: ${remainingSessionsAfter} حصة).`,
+          message: `تم إكمال الحصة بنجاح! تم احتساب الحصة للمعلم (${sess.teacherNameAr})، ${studentMsg}، وتسجيل الحضور في شيت الحضور والغياب.`,
           studentName: sess.studentNameAr,
           teacherName: sess.teacherNameAr,
           remainingSessions: remainingSessionsAfter,

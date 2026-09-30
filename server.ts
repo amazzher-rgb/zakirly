@@ -358,9 +358,17 @@ async function startServer() {
 
   // 1. Session Completion Workflow
   app.post('/api/workflows/complete-session', (req: Request, res: Response) => {
-    const { sessionId, attendanceStatus, notes, performedBy } = req.body;
+    const { sessionId, attendanceStatus, notes, performedBy, sessionData } = req.body;
 
-    const session = db.sessions.find((s) => s.id === sessionId);
+    let session = db.sessions.find((s) => s.id === sessionId);
+    if (!session && sessionData) {
+      session = {
+        ...sessionData,
+        id: sessionData.id || sessionId || `sess-${Date.now()}`,
+      };
+      db.sessions.unshift(session);
+    }
+
     if (!session) {
       return res.status(404).json({ success: false, message: 'الحصة غير موجودة' });
     }
@@ -416,8 +424,8 @@ async function startServer() {
         balance: 0,
         enrolledCourseIds: [session.courseId || 'cs-101'],
         totalSessionsCompleted: 0,
-        remainingSessions: 16,
-        status: 'active',
+        remainingSessions: 0,
+        status: 'pending_renewal',
         packageId: `sub-${Date.now()}`,
         createdAt: todayDate,
       };
@@ -429,7 +437,9 @@ async function startServer() {
       session.studentId = student.id;
       session.studentNameAr = student.nameAr;
 
-      student.remainingSessions = (student.remainingSessions ?? 0) - 1;
+      // Deduct 1 session from student - CAN GO NEGATIVE if unrenewed!
+      const currentRem = typeof student.remainingSessions === 'number' ? student.remainingSessions : 0;
+      student.remainingSessions = currentRem - 1;
       student.totalSessionsCompleted = (student.totalSessionsCompleted || 0) + 1;
       remainingSessionsAfter = student.remainingSessions;
       if (student.remainingSessions <= 0) {
@@ -446,20 +456,19 @@ async function startServer() {
           studentNameAr: student.nameAr,
           courseId: session.courseId || 'cs-101',
           courseTitleAr: session.subjectNameAr || 'مادة تعليمية',
-          totalSessions: 16,
-          remainingSessions: 16,
-          status: 'active',
+          totalSessions: Math.max(1, student.totalSessionsCompleted || 1),
+          remainingSessions: student.remainingSessions,
+          status: 'pending_renewal',
           startDate: todayDate,
           endDate: todayDate,
           price: 3200,
-          paidAmount: 3200,
+          paidAmount: 0,
           autoRenewal: false,
         };
         db.subscriptions.unshift(sub);
-      }
-
-      if (sub) {
-        sub.remainingSessions = (sub.remainingSessions ?? 0) - 1;
+      } else {
+        const currentSubRem = typeof sub.remainingSessions === 'number' ? sub.remainingSessions : 0;
+        sub.remainingSessions = currentSubRem - 1;
         if (sub.remainingSessions <= 2) {
           sub.status = 'pending_renewal';
           student.status = 'pending_renewal';
@@ -470,7 +479,7 @@ async function startServer() {
             targetRole: 'administrative_director',
             titleAr: `تنبيه تجديد باقة: ${student.nameAr}`,
             titleEn: `Package Renewal Alert: ${student.nameEn}`,
-            messageAr: `المتبقي ${sub.remainingSessions} حصص فقط للطالب ${student.nameAr} في باقة ${sub.courseTitleAr}.`,
+            messageAr: `المتبقي ${sub.remainingSessions} حصص فقط للطالب ${student.nameAr} في باقة ${sub.courseTitleAr} ${sub.remainingSessions < 0 ? '(بالسالب - يستلزم التجديد الفوري)' : ''}.`,
             messageEn: `Only ${sub.remainingSessions} sessions left for ${student.nameEn}.`,
             type: 'warning',
             read: false,
