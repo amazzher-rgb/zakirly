@@ -3,6 +3,7 @@ import { ScheduledSession } from '../types';
 import { AccountingCycle } from '../utils/accountingUtils';
 import { Calendar, Clock, User, BookOpen, CheckCircle2, X, Search, FileSpreadsheet } from 'lucide-react';
 import { exportToExcel } from '../utils/excelExporter';
+import { formatTime12H } from '../utils/timeUtils';
 
 interface CompletedSessionsDetailsModalProps {
   isOpen: boolean;
@@ -88,7 +89,7 @@ export const CompletedSessionsDetailsModal: React.FC<CompletedSessionsDetailsMod
     const dataToExport = filtered.map((s, idx) => ({
       '#': idx + 1,
       'التاريخ': s.date || '',
-      'الوقت': `${s.startTime || ''} - ${s.endTime || ''}`,
+      'الوقت': `${formatTime12H(s.startTime)} - ${formatTime12H(s.endTime)}`,
       'المادة / الكورس': s.subjectNameAr || 'مادة دراسية',
       'المعلم': s.teacherNameAr || '',
       'الطالب': s.studentNameAr || '',
@@ -282,7 +283,7 @@ export const CompletedSessionsDetailsModal: React.FC<CompletedSessionsDetailsMod
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
                           <Clock className="w-3 h-3 text-amber-500 shrink-0" />
-                          <span>{s.startTime} - {s.endTime}</span>
+                          <span>{formatTime12H(s.startTime)} - {formatTime12H(s.endTime)}</span>
                           {s.durationMinutes && <span className="text-slate-400">({s.durationMinutes} دقيقة)</span>}
                         </div>
                       </td>

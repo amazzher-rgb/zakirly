@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { CourseSubject, TrialLesson } from '../types';
 import { BookOpen, Plus, Edit2, Trash2, Clock, DollarSign, X, Layers, Search, LayoutGrid, List, Sparkles, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { Time12HPicker } from '../components/Time12HPicker';
 
 export const CoursesModule: React.FC = () => {
   const { db, lang, searchQuery, currencySymbol, activeTenantId, setActiveTenantId, setActiveModule, updateDatabaseState } = useApp();
@@ -557,26 +558,22 @@ export const CoursesModule: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">تاريخ الحصة</label>
-                    <input
-                      type="date"
-                      value={trialDate}
-                      onChange={(e) => setTrialDate(e.target.value)}
-                      className="w-full border border-slate-200 p-2.5 rounded-xl font-mono"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">تاريخ الحصة</label>
+                  <input
+                    type="date"
+                    value={trialDate}
+                    onChange={(e) => setTrialDate(e.target.value)}
+                    className="w-full border border-slate-200 p-2.5 rounded-xl font-mono text-xs"
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">الوقت</label>
-                    <input
-                      type="time"
-                      value={trialTime}
-                      onChange={(e) => setTrialTime(e.target.value)}
-                      className="w-full border border-slate-200 p-2.5 rounded-xl font-mono"
-                    />
-                  </div>
+                <div className="pt-1">
+                  <Time12HPicker
+                    value={trialTime}
+                    onChange={setTrialTime}
+                    label="وقت الحصة (توقيت 12 ساعة)"
+                  />
                 </div>
 
                 <div className="pt-3 border-t flex justify-end gap-2 text-xs font-bold">

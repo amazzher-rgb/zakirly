@@ -3,6 +3,7 @@ import { FileSpreadsheet, Download, CheckCircle2, AlertCircle, RefreshCw, X, Ext
 import { useApp } from '../context/AppContext';
 import { exportToExcel } from '../utils/excelExporter';
 import { calculateInvoiceProfitInEgp } from '../utils/currencyUtils';
+import { formatTime12H } from '../utils/timeUtils';
 
 interface GoogleSheetsModalProps {
   isOpen: boolean;
@@ -108,7 +109,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({ isOpen, on
         ses.teacherNameAr,
         ses.studentNameAr,
         ses.date,
-        `${ses.startTime} - ${ses.endTime}`,
+        `${formatTime12H(ses.startTime)} - ${formatTime12H(ses.endTime)}`,
         ses.durationMinutes,
         ses.meetingUrl || '',
         ses.status === 'completed' ? 'مكتملة' : ses.status === 'scheduled' ? 'مجدولة' : 'ملغاة',
@@ -150,7 +151,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({ isOpen, on
         t.courseTitleAr,
         t.assignedTeacherNameAr,
         t.scheduledDate,
-        t.scheduledTime,
+        formatTime12H(t.scheduledTime),
         t.status === 'converted' ? 'تم التحويل لطالب مدفوع' : t.status === 'completed' ? 'مكتملة (جاهزة للتحويل)' : t.status === 'cancelled' ? 'ملغاة' : 'مجدولة',
         t.createdAt || t.scheduledDate,
       ]);
@@ -246,7 +247,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({ isOpen, on
         'المعلم': ses.teacherNameAr,
         'الطالب': ses.studentNameAr,
         'التاريخ': ses.date,
-        'الوقت': `${ses.startTime} - ${ses.endTime}`,
+        'الوقت': `${formatTime12H(ses.startTime)} - ${formatTime12H(ses.endTime)}`,
         'المدة (دقيقة)': ses.durationMinutes,
         'رابط الاجتماع': ses.meetingUrl || '',
         'الحالة': ses.status === 'completed' ? 'مكتملة' : ses.status === 'scheduled' ? 'مجدولة' : 'ملغاة',
@@ -284,7 +285,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({ isOpen, on
         'المادة / الدورة': t.courseTitleAr,
         'المعلم المعين': t.assignedTeacherNameAr,
         'تاريخ الحصة': t.scheduledDate,
-        'الموعد': t.scheduledTime,
+        'الموعد': formatTime12H(t.scheduledTime),
         'الحالة': t.status === 'converted' ? 'تم التحويل لطالب مدفوع' : t.status === 'completed' ? 'مكتملة' : t.status === 'cancelled' ? 'ملغاة' : 'مجدولة',
         'تاريخ الطلب': t.createdAt || t.scheduledDate,
       }));

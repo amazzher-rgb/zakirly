@@ -982,9 +982,18 @@ async function startServer() {
     const course = db.courseSubjects.find((c) => c.id === courseId);
 
     const dur = Number(durationMinutes) || 60;
-    const [h, m] = (startTime || '17:00').split(':').map(Number);
-    const endH = (h + Math.floor((m + dur) / 60)) % 24;
-    const endM = (m + dur) % 60;
+    const safeStartStr = String(startTime || '17:00').trim();
+    let startH = 17;
+    let startM = 0;
+    const timeMatch = safeStartStr.match(/(\d{1,2})[:.](\d{2})/);
+    if (timeMatch) {
+      startH = parseInt(timeMatch[1], 10);
+      startM = parseInt(timeMatch[2], 10);
+      if (/pm|م|مساء/i.test(safeStartStr) && startH < 12) startH += 12;
+      if (/am|ص|صباح/i.test(safeStartStr) && startH === 12) startH = 0;
+    }
+    const endH = (startH + Math.floor((startM + dur) / 60)) % 24;
+    const endM = (startM + dur) % 60;
     const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 
     const newSession: ScheduledSession = {

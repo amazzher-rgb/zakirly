@@ -25,6 +25,7 @@ import {
   ParsedTeacherRow,
   ParsedSessionRow,
 } from '../utils/excelImporter';
+import { formatTime12H } from '../utils/timeUtils';
 
 export type ExcelImportType = 'students' | 'teachers' | 'sessions';
 
@@ -81,7 +82,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         return {
           title: 'استيراد شيت جدول الحصص (Excel)',
           description:
-            'ارفع شيت مواعيد الحصص وسيتم إدراجها في الجدول الأسبوعي وفق أيام الأسبوع وربطها بالمعلمين والطلاب وروابط Teams فوراً.',
+            'ارفع شيت مواعيد الحصص وسيتم إدراجها في الجدول الأسبوعي وفق أيام الأسبوع والمواعيد بنظام 12 ساعة (مثل: 05:00 م) وربطها بالمعلمين والطلاب وروابط Teams فوراً.',
           color: 'indigo',
           downloadTemplate: downloadSessionsTemplate,
         };
@@ -722,7 +723,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                         <tr>
                           <th className="p-3">#</th>
                           <th className="p-3">يوم الحصة الأسبوعي</th>
-                          <th className="p-3">الوقت</th>
+                          <th className="p-3">الوقت (توقيت 12 ساعة)</th>
                           <th className="p-3">المدة</th>
                           <th className="p-3">اسم الطالب</th>
                           <th className="p-3">اسم المعلم</th>
@@ -791,7 +792,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                                 يوم {ses.dayNameAr || ses.date}
                               </span>
                             </td>
-                            <td className="p-3 font-mono text-blue-700 font-bold">{ses.startTime}</td>
+                            <td className="p-3 font-mono text-blue-700 font-bold">{formatTime12H(ses.startTime)}</td>
                             <td className="p-3 text-slate-600">{ses.durationMinutes} دقيقة</td>
                             <td className="p-3 font-bold text-slate-800">{ses.studentNameAr}</td>
                             <td className="p-3 text-slate-700">{ses.teacherNameAr}</td>

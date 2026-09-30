@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { formatTime12H } from '../utils/timeUtils';
 import {
   Users,
   GraduationCap,
@@ -330,7 +331,7 @@ export const DashboardModule: React.FC = () => {
                       </span>
                       <span className="font-extrabold text-slate-900">{session.subjectNameAr}</span>
                       <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-bold">
-                        {session.startTime} - {session.endTime}
+                        {formatTime12H(session.startTime)} - {formatTime12H(session.endTime)}
                       </span>
                       <span
                         className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${

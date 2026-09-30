@@ -5,6 +5,8 @@ import { Sparkles, CheckCircle2, ArrowLeftRight, UserCheck, Plus, X, Trash2, Fil
 import { CURRENCIES, getCurrencySymbol } from '../utils/currencyUtils';
 import { GoogleSheetsModal } from '../components/GoogleSheetsModal';
 import { exportToExcel } from '../utils/excelExporter';
+import { formatTime12H } from '../utils/timeUtils';
+import { Time12HPicker } from '../components/Time12HPicker';
 
 export const TrialLessonsModule: React.FC = () => {
   const { db, lang, convertTrial, currencySymbol, updateDatabaseState, activeTenantId, setActiveTenantId, role } = useApp();
@@ -286,7 +288,7 @@ export const TrialLessonsModule: React.FC = () => {
       'المادة / الكورس': t.courseTitleAr,
       'المعلم المعين': t.assignedTeacherNameAr,
       'تاريخ الحصة': t.scheduledDate,
-      'الموعد': t.scheduledTime,
+      'الموعد': formatTime12H(t.scheduledTime),
       'الحالة':
         t.status === 'converted'
           ? 'تم التحويل لطالب مدفوع'
@@ -674,7 +676,7 @@ export const TrialLessonsModule: React.FC = () => {
 
                         <td className="p-3 text-center font-mono text-[11px] text-slate-700">
                           <div className="font-bold">{trial.scheduledDate}</div>
-                          <div className="text-slate-500 text-[10px]">{trial.scheduledTime}</div>
+                          <div className="text-slate-500 text-[10px] font-bold text-blue-700">{formatTime12H(trial.scheduledTime)}</div>
                         </td>
 
                         <td className="p-3 text-center">
@@ -787,7 +789,7 @@ export const TrialLessonsModule: React.FC = () => {
                       <div className="truncate">ولي الأمر: <strong className="text-slate-800">{trial.parentNameAr}</strong></div>
                       <div className="truncate">الهاتف: <strong className="font-mono text-emerald-800">{trial.parentPhone}</strong></div>
                       <div className="truncate">المعلم: <strong className="text-slate-800">{trial.assignedTeacherNameAr}</strong></div>
-                      <div className="truncate font-mono text-slate-900 font-bold">{trial.scheduledDate} ({trial.scheduledTime})</div>
+                      <div className="truncate font-mono text-slate-900 font-bold">{trial.scheduledDate} ({formatTime12H(trial.scheduledTime)})</div>
                     </div>
                   </div>
 
@@ -1026,13 +1028,11 @@ export const TrialLessonsModule: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">الوقت</label>
-                  <input
-                    type="time"
+                <div className="col-span-2">
+                  <Time12HPicker
                     value={scheduledTime}
-                    onChange={(e) => setScheduledTime(e.target.value)}
-                    className="w-full border border-slate-200 p-2.5 rounded-xl font-mono"
+                    onChange={setScheduledTime}
+                    label="وقت الحصة (توقيت 12 ساعة)"
                   />
                 </div>
               </div>

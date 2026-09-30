@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Student, Teacher, ScheduledSession, DatabaseState } from '../types';
+import { normalizeTo24H } from './timeUtils';
 
 /**
  * Flexible column value lookup in row object regardless of header formatting,
@@ -92,17 +93,7 @@ export function parseExcelTime(val: any): string {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
-  const s = String(val).trim();
-  const match = s.match(/(\d{1,2}):(\d{2})/);
-  if (match) {
-    let h = parseInt(match[1], 10);
-    const m = parseInt(match[2], 10);
-    if (/pm|م/i.test(s) && h < 12) h += 12;
-    if (/am|ص/i.test(s) && h === 12) h = 0;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  }
-
-  return '17:00';
+  return normalizeTo24H(String(val));
 }
 
 /**
@@ -472,7 +463,16 @@ export function parseSessionsFromRows(
     ]);
     const dayResolved = resolveDayOfWeek(dayVal);
 
-    const timeVal = getRowValue(row, ['الوقت', 'الساعة', 'وقت البدء', 'Time', 'Start Time']);
+    const timeVal = getRowValue(row, [
+      'الوقت',
+      'الساعة',
+      'وقت البدء',
+      'الوقت (12 ساعة)',
+      'موعد الحصة',
+      'توقيت الحصة',
+      'Time',
+      'Start Time',
+    ]);
     const startTime = parseExcelTime(timeVal);
 
     const durationRaw = getRowValue(row, ['المدة', 'مدة الحصة', 'المدة بالدقائق', 'Duration', 'Minutes']);
@@ -538,38 +538,38 @@ export function downloadSessionsTemplate() {
     {
       'كود الحصة': 'SES-5001',
       'يوم الحصة': 'السبت',
-      'وقت البدء': '17:00',
+      'وقت البدء': '05:00 م',
       'المدة بالدقائق': 60,
       'اسم الطالب': 'أحمد محمد علي',
       'اسم المعلم': 'أ. أحمد السيد',
       'المادة الدراسية': 'الرياضيات',
       'رابط Microsoft Teams': 'https://teams.microsoft.com/l/meetup-join/zakirly-demo-1',
       'الحالة': 'مجدولة',
-      'ملاحظات': 'حصة أسبوعية ثابتة',
+      'ملاحظات': 'حصة أسبوعية ثابتة بتوقيت 12 ساعة',
     },
     {
       'كود الحصة': 'SES-5002',
       'يوم الحصة': 'الإثنين',
-      'وقت البدء': '18:30',
+      'وقت البدء': '06:30 م',
       'المدة بالدقائق': 60,
       'اسم الطالب': 'سارة خالد محمود',
       'اسم المعلم': 'أ. فاطمة الزهراء',
       'المادة الدراسية': 'اللغة الإنجليزية IGCSE',
       'رابط Microsoft Teams': 'https://teams.microsoft.com/l/meetup-join/zakirly-demo-2',
       'الحالة': 'مجدولة',
-      'ملاحظات': 'حصة أسبوعية ثابتة',
+      'ملاحظات': 'حصة أسبوعية ثابتة بتوقيت 12 ساعة',
     },
     {
       'كود الحصة': 'SES-5003',
       'يوم الحصة': 'الأربعاء',
-      'وقت البدء': '16:00',
+      'وقت البدء': '04:00 م',
       'المدة بالدقائق': 60,
       'اسم الطالب': 'يوسف إبراهيم',
       'اسم المعلم': 'م. هشام عبد المنعم',
       'المادة الدراسية': 'الرياضيات المتقدمة',
       'رابط Microsoft Teams': 'https://teams.microsoft.com/l/meetup-join/zakirly-demo-3',
       'الحالة': 'مجدولة',
-      'ملاحظات': 'حصة أسبوعية ثابتة',
+      'ملاحظات': 'حصة أسبوعية ثابتة بتوقيت 12 ساعة',
     },
   ];
 

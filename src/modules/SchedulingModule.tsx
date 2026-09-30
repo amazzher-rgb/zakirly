@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import { CalendarDays, Plus, Clock, Video, User, BookOpen, AlertCircle, CheckCircle2, Play, X, Trash2, VideoOff, ChevronDown, ChevronUp, FileSpreadsheet, Download } from 'lucide-react';
 import { ExcelImportModal } from '../components/ExcelImportModal';
 import { exportToExcel } from '../utils/excelExporter';
+import { formatTime12H } from '../utils/timeUtils';
+import { Time12HPicker } from '../components/Time12HPicker';
 
 export const WEEK_DAYS = [
   { id: 'all', nameAr: 'جميع الأيام', dayNum: -1 },
@@ -178,8 +180,8 @@ export const SchedulingModule: React.FC = () => {
       return {
         'كود الحصة': s.code,
         'يوم الحصة': dayInfo.nameAr,
-        'وقت البدء': s.startTime,
-        'وقت الانتهاء': s.endTime,
+        'وقت البدء': formatTime12H(s.startTime),
+        'وقت الانتهاء': formatTime12H(s.endTime),
         'المدة بالدقائق': s.durationMinutes,
         'اسم الطالب': s.studentNameAr,
         'اسم المعلم': s.teacherNameAr,
@@ -527,34 +529,29 @@ export const SchedulingModule: React.FC = () => {
                 </p>
               </div>
 
-              {/* Time & Duration */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">وقت البدء*</label>
-                  <input
-                    type="time"
-                    required
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full border border-slate-200 p-2.5 rounded-xl font-mono text-xs font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">المدة (بالدقائق)*</label>
-                  <select
-                    value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                    className="w-full border border-slate-200 p-2.5 rounded-xl font-bold text-xs"
-                  >
-                    <option value={30}>30 دقيقة</option>
-                    <option value={45}>45 دقيقة</option>
-                    <option value={60}>60 دقيقة (ساعة)</option>
-                    <option value={90}>90 دقيقة (ساعة ونصف)</option>
-                    <option value={120}>120 دقيقة (ساعتان)</option>
-                  </select>
-                </div>
+              {/* Duration */}
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">مدة الحصة*</label>
+                <select
+                  value={durationMinutes}
+                  onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                  className="w-full border border-slate-200 p-2.5 rounded-xl font-bold text-xs bg-white"
+                >
+                  <option value={30}>30 دقيقة (نصف ساعة)</option>
+                  <option value={45}>45 دقيقة</option>
+                  <option value={60}>60 دقيقة (ساعة كاملة)</option>
+                  <option value={90}>90 دقيقة (ساعة ونصف)</option>
+                  <option value={120}>120 دقيقة (ساعتان)</option>
+                </select>
               </div>
+
+              {/* 12-Hour Time Picker */}
+              <Time12HPicker
+                value={startTime}
+                onChange={setStartTime}
+                durationMinutes={durationMinutes}
+                label="موعد الحصة (توقيت 12 ساعة)"
+              />
 
               <div>
                 <label className="block text-slate-700 font-bold mb-1 flex items-center justify-between">
@@ -654,7 +651,9 @@ const SessionCard: React.FC<{
         <div className="space-y-1 text-[10px] sm:text-xs text-slate-700 bg-slate-50 p-2 rounded-xl border border-slate-100">
           <div className="flex items-center justify-between font-mono">
             <span className="text-slate-400 text-[9px] sm:text-[10px]">الموعد:</span>
-            <span className="font-bold text-blue-800 text-[10px] sm:text-xs">{session.startTime} - {session.endTime}</span>
+            <span className="font-bold text-blue-800 text-[10px] sm:text-xs">
+              {formatTime12H(session.startTime)} - {formatTime12H(session.endTime)}
+            </span>
           </div>
 
           <div className="flex items-center justify-between truncate">
