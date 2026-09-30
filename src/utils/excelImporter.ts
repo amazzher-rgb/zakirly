@@ -162,7 +162,7 @@ export function parseStudentsFromRows(rows: any[], existingStudents: Student[]):
     const parentPhone = getRowValue(row, ['هاتف ولي الأمر', 'رقم ولي الأمر', 'Parent Phone']);
 
     const remainingSessionsRaw = getRowValue(row, ['الحصص المتبقية', 'عدد الحصص', 'الحصص', 'Remaining Sessions', 'Sessions']);
-    const remainingSessions = !isNaN(Number(remainingSessionsRaw)) && Number(remainingSessionsRaw) >= 0 ? Number(remainingSessionsRaw) : 12;
+    const remainingSessions = !isNaN(Number(remainingSessionsRaw)) ? Number(remainingSessionsRaw) : 12;
 
     const balanceRaw = getRowValue(row, ['الرصيد', 'الرصيد المالي', 'Balance']);
     const balance = !isNaN(Number(balanceRaw)) ? Number(balanceRaw) : 0;
@@ -171,7 +171,7 @@ export function parseStudentsFromRows(rows: any[], existingStudents: Student[]):
 
     const statusRaw = String(getRowValue(row, ['الحالة', 'Status']) || 'active').trim().toLowerCase();
     let status: 'active' | 'inactive' | 'trial' | 'pending_renewal' = 'active';
-    if (statusRaw.includes('تجديد') || statusRaw.includes('pending') || remainingSessions === 0) {
+    if (statusRaw.includes('تجديد') || statusRaw.includes('pending') || remainingSessions <= 0) {
       status = 'pending_renewal';
     } else if (statusRaw.includes('تجريب') || statusRaw.includes('trial')) {
       status = 'trial';

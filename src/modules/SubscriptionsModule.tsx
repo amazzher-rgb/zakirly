@@ -145,12 +145,15 @@ export const SubscriptionsModule: React.FC = () => {
           : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
       }>
         {db.subscriptions.map((sub) => {
+          const isNegative = sub.remainingSessions < 0;
           const isLow = sub.remainingSessions <= 2;
           return (
             <div
               key={sub.id}
               className={`p-3 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-                isLow
+                isNegative
+                  ? 'bg-rose-50/80 border-rose-300 shadow-sm'
+                  : isLow
                   ? 'bg-amber-50/70 border-amber-300 shadow-sm'
                   : 'bg-white border-slate-200 hover:border-blue-300 shadow-sm'
               }`}
@@ -165,10 +168,14 @@ export const SubscriptionsModule: React.FC = () => {
                   <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                     <span
                       className={`px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold ${
-                        isLow ? 'bg-amber-200 text-amber-900 animate-pulse' : 'bg-emerald-100 text-emerald-800'
+                        isNegative
+                          ? 'bg-rose-200 text-rose-950 font-black animate-pulse'
+                          : isLow
+                          ? 'bg-amber-200 text-amber-900 animate-pulse'
+                          : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      {isLow ? 'يلزم التجديد' : 'نشط'}
+                      {isNegative ? `بالسالب (${sub.remainingSessions})` : isLow ? 'يلزم التجديد' : 'نشط'}
                     </span>
 
                     <button
@@ -182,10 +189,14 @@ export const SubscriptionsModule: React.FC = () => {
                 </div>
 
                 <div className="space-y-1 sm:space-y-2 text-[10px] sm:text-xs">
-                  <div className="p-2 sm:p-3 bg-white/80 rounded-xl border border-slate-200 flex items-center justify-between">
+                  <div className={`p-2 sm:p-3 rounded-xl border flex items-center justify-between ${
+                    isNegative ? 'bg-rose-100/60 border-rose-200' : 'bg-white/80 border-slate-200'
+                  }`}>
                     <span className="text-slate-500 font-medium">المتبقي:</span>
-                    <span className={`font-black text-xs sm:text-sm ${isLow ? 'text-amber-700' : 'text-slate-900'}`}>
-                      {sub.remainingSessions} / {sub.totalSessions}
+                    <span className={`font-black text-xs sm:text-sm ${
+                      isNegative ? 'text-rose-700' : isLow ? 'text-amber-700' : 'text-slate-900'
+                    }`}>
+                      {sub.remainingSessions} / {sub.totalSessions} {isNegative && '(بالسالب)'}
                     </span>
                   </div>
 

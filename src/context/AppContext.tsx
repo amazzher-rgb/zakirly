@@ -1052,11 +1052,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           sess.studentId = student.id;
           sess.studentNameAr = student.nameAr;
 
-          if (student.remainingSessions > 0) {
-            student.remainingSessions -= 1;
-          }
+          student.remainingSessions = (student.remainingSessions ?? 0) - 1;
           student.totalSessionsCompleted = (student.totalSessionsCompleted || 0) + 1;
           remainingSessionsAfter = student.remainingSessions;
+          if (student.remainingSessions <= 0) {
+            student.status = 'pending_renewal';
+          }
 
           let sub = draft.subscriptions.find((sb: any) => sb.studentId === student!.id || sb.id === student!.packageId);
           if (!sub) {
@@ -1080,7 +1081,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
 
           if (sub) {
-            if (sub.remainingSessions > 0) sub.remainingSessions -= 1;
+            sub.remainingSessions = (sub.remainingSessions ?? 0) - 1;
+            if (sub.remainingSessions <= 0) {
+              sub.status = 'pending_renewal';
+            }
           }
         }
 
@@ -1401,8 +1405,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }).length;
 
         if (studentCompletedInCycle > 0) {
-          st.remainingSessions = Math.max(0, (st.remainingSessions || 0) - studentCompletedInCycle);
+          st.remainingSessions = (st.remainingSessions || 0) - studentCompletedInCycle;
           st.totalSessionsCompleted = (st.totalSessionsCompleted || 0) + studentCompletedInCycle;
+          if (st.remainingSessions <= 0) {
+            st.status = 'pending_renewal';
+          }
         }
       });
     });
@@ -1502,8 +1509,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const consumedCount = Math.max(studentCycleSessions.length, studentCycleAttendance.length);
             const deductCount = consumedCount > 0 ? consumedCount : 1;
 
-            st.remainingSessions = Math.max(0, (st.remainingSessions || 12) - deductCount);
-            if (st.remainingSessions === 0) {
+            st.remainingSessions = (st.remainingSessions || 12) - deductCount;
+            if (st.remainingSessions <= 0) {
               st.status = 'pending_renewal';
             }
           }

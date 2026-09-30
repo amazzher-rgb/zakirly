@@ -143,16 +143,22 @@ export const AttendanceModule: React.FC = () => {
       const draftSt = draft.students.find((s) => s.id === st.id);
       const draftTch = draft.teachers.find((t) => t.id === (tch?.id || st.teacherId));
 
-      // If student attended or late, deduct remaining session from student & credit session to teacher
+      // If student attended or late, deduct remaining session from student (can go negative if unrenewed) & credit session to teacher
       if (status === 'present' || status === 'late') {
-        if (draftSt && draftSt.remainingSessions > 0) {
-          draftSt.remainingSessions -= 1;
+        if (draftSt) {
+          draftSt.remainingSessions = (draftSt.remainingSessions ?? 0) - 1;
           draftSt.totalSessionsCompleted = (draftSt.totalSessionsCompleted || 0) + 1;
+          if (draftSt.remainingSessions <= 0) {
+            draftSt.status = 'pending_renewal';
+          }
         }
 
         const sub = draft.subscriptions?.find((sb) => sb.studentId === st.id || sb.id === st.packageId);
-        if (sub && sub.remainingSessions > 0) {
-          sub.remainingSessions -= 1;
+        if (sub) {
+          sub.remainingSessions = (sub.remainingSessions ?? 0) - 1;
+          if (sub.remainingSessions <= 0) {
+            sub.status = 'pending_renewal';
+          }
         }
 
         if (draftTch) {

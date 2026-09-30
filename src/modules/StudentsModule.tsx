@@ -8,6 +8,7 @@ import {
   Filter,
   Download,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   Phone,
   Mail,
@@ -390,12 +391,27 @@ export const StudentsModule: React.FC = () => {
                     </div>
 
                     {/* Sessions & Balance */}
-                    <div className="flex items-center justify-between text-[10px] bg-blue-50/60 p-1.5 rounded-xl border border-blue-100">
-                      <div className="flex items-center gap-0.5 font-black text-slate-900">
-                        {isLowSessions && <AlertTriangle className="w-2.5 h-2.5 text-amber-600 shrink-0" />}
-                        <span className={isLowSessions ? 'text-amber-700 font-black' : 'text-emerald-700 font-black'}>
-                          {student.remainingSessions} ح
-                        </span>
+                    <div className={`flex items-center justify-between text-[10px] p-1.5 rounded-xl border ${
+                      student.remainingSessions < 0
+                        ? 'bg-rose-50/90 border-rose-300 text-rose-900'
+                        : 'bg-blue-50/60 border-blue-100'
+                    }`}>
+                      <div className="flex items-center gap-0.5 font-black">
+                        {student.remainingSessions < 0 ? (
+                          <span className="text-rose-700 font-black flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                            <span>{student.remainingSessions} ح (بالسالب)</span>
+                          </span>
+                        ) : isLowSessions ? (
+                          <span className="text-amber-700 font-black flex items-center gap-1">
+                            <AlertTriangle className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                            <span>{student.remainingSessions} ح</span>
+                          </span>
+                        ) : (
+                          <span className="text-emerald-700 font-black">
+                            {student.remainingSessions} ح
+                          </span>
+                        )}
                       </div>
                       <div className={`font-black ${student.balance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
                         {student.balance} {currencySymbol}
@@ -511,14 +527,29 @@ export const StudentsModule: React.FC = () => {
                   </div>
 
                   {/* Stats row: Sessions & Balance */}
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/60 border border-blue-100 text-xs">
+                  <div className={`flex items-center justify-between p-2.5 rounded-xl border text-xs ${
+                    student.remainingSessions < 0
+                      ? 'bg-rose-50/90 border-rose-300'
+                      : 'bg-blue-50/60 border-blue-100'
+                  }`}>
                     <div>
                       <span className="text-[10px] text-slate-500 font-bold block">الحصص المتبقية:</span>
-                      <div className="flex items-center gap-1 font-black text-slate-900">
-                        {isLowSessions && <AlertTriangle className="w-3 h-3 text-amber-600" />}
-                        <span className={isLowSessions ? 'text-amber-700' : 'text-emerald-700'}>
-                          {student.remainingSessions} حصة
-                        </span>
+                      <div className="flex items-center gap-1 font-black">
+                        {student.remainingSessions < 0 ? (
+                          <span className="text-rose-700 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                            <span>{student.remainingSessions} حصة (بالسالب)</span>
+                          </span>
+                        ) : isLowSessions ? (
+                          <span className="text-amber-700 flex items-center gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                            <span>{student.remainingSessions} {student.remainingSessions === 0 ? 'حصة (نفدت)' : 'حصة'}</span>
+                          </span>
+                        ) : (
+                          <span className="text-emerald-700">
+                            {student.remainingSessions} حصة
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -645,19 +676,31 @@ export const StudentsModule: React.FC = () => {
 
                       <td className="p-3.5 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          <div
-                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black ${
-                              isLowSessions
-                                ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
-                                : 'bg-emerald-100 text-emerald-900'
-                            }`}
-                          >
-                            {isLowSessions && <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
-                            <span>{student.remainingSessions} حصة متاحة</span>
-                          </div>
-                          <span className="text-[10px] text-blue-700 font-extrabold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                            🔄 مرحّل تلقائياً للدورة الجديدة
-                          </span>
+                          {student.remainingSessions < 0 ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-900 border border-rose-300 animate-pulse">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              <span>{student.remainingSessions} حصة (بالسالب)</span>
+                            </div>
+                          ) : isLowSessions ? (
+                            <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>{student.remainingSessions} {student.remainingSessions === 0 ? 'حصة (نفدت)' : 'حصة متاحة'}</span>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-900">
+                              <span>{student.remainingSessions} حصة متاحة</span>
+                            </div>
+                          )}
+
+                          {student.remainingSessions < 0 ? (
+                            <span className="text-[10px] text-rose-700 font-extrabold bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                              ⚠️ حضر {Math.abs(student.remainingSessions)} حصص دون تجديد
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-blue-700 font-extrabold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                              🔄 مرحّل تلقائياً للدورة الجديدة
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -802,9 +845,21 @@ export const StudentsModule: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-3 bg-blue-50 rounded-xl space-y-1">
-                <span className="text-blue-600 text-[10px]">الحصص المتبقية:</span>
-                <div className="font-black text-blue-900 text-base">{selectedStudent.remainingSessions} حصة</div>
+              <div className={`p-3 rounded-xl space-y-1 ${
+                selectedStudent.remainingSessions < 0
+                  ? 'bg-rose-50 border border-rose-200 text-rose-900'
+                  : 'bg-blue-50 text-blue-900'
+              }`}>
+                <span className={`text-[10px] font-bold ${
+                  selectedStudent.remainingSessions < 0 ? 'text-rose-600' : 'text-blue-600'
+                }`}>
+                  {selectedStudent.remainingSessions < 0 ? 'رصيد الحصص (بالسالب):' : 'الحصص المتبقية:'}
+                </span>
+                <div className={`font-black text-base ${
+                  selectedStudent.remainingSessions < 0 ? 'text-rose-700' : 'text-blue-900'
+                }`}>
+                  {selectedStudent.remainingSessions} حصة {selectedStudent.remainingSessions < 0 && '(غير مجدد)'}
+                </div>
               </div>
 
               <div className="p-3 bg-emerald-50 rounded-xl space-y-1">

@@ -429,11 +429,12 @@ async function startServer() {
       session.studentId = student.id;
       session.studentNameAr = student.nameAr;
 
-      if (student.remainingSessions > 0) {
-        student.remainingSessions -= 1;
-      }
+      student.remainingSessions = (student.remainingSessions ?? 0) - 1;
       student.totalSessionsCompleted = (student.totalSessionsCompleted || 0) + 1;
       remainingSessionsAfter = student.remainingSessions;
+      if (student.remainingSessions <= 0) {
+        student.status = 'pending_renewal';
+      }
 
       // Check subscription
       let sub = db.subscriptions.find((sb) => sb.studentId === student!.id || sb.id === student!.packageId);
@@ -458,7 +459,7 @@ async function startServer() {
       }
 
       if (sub) {
-        if (sub.remainingSessions > 0) sub.remainingSessions -= 1;
+        sub.remainingSessions = (sub.remainingSessions ?? 0) - 1;
         if (sub.remainingSessions <= 2) {
           sub.status = 'pending_renewal';
           student.status = 'pending_renewal';
