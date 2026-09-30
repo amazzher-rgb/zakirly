@@ -56,6 +56,31 @@ function savePersistentDb(data: DatabaseState) {
   }
 }
 
+// Auto-renew completed sessions after 2.5 minutes (150 seconds) so they are automatically scheduled for next week
+function autoResetCompletedSessions(database: DatabaseState) {
+  if (!database || !Array.isArray(database.sessions)) return;
+  const now = Date.now();
+  const AUTO_RESET_MS = 150 * 1000;
+  let modified = false;
+  database.sessions.forEach((s) => {
+    if (s.status === 'completed' && s.completedAt) {
+      const elapsed = now - new Date(s.completedAt).getTime();
+      if (elapsed >= AUTO_RESET_MS) {
+        s.status = 'scheduled';
+        modified = true;
+      }
+    }
+  });
+  if (modified) {
+    savePersistentDb(database);
+  }
+}
+
+// Periodically check for auto-renewal every 10 seconds
+setInterval(() => {
+  autoResetCompletedSessions(db);
+}, 10000);
+
 // Server-Sent Events (SSE) connected clients array for Real-Time Sync
 const sseClients: { id: string; res: Response }[] = [];
 
@@ -177,6 +202,7 @@ async function startServer() {
 
   // Get Complete Database State
   app.get('/api/state', (req: Request, res: Response) => {
+    autoResetCompletedSessions(db);
     const kpis = calculateKPIs(db);
     res.json({
       success: true,

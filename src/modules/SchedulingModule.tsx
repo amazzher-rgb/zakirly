@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { CalendarDays, Plus, Clock, Video, User, BookOpen, AlertCircle, CheckCircle2, Play, X, Trash2, VideoOff, ChevronDown, ChevronUp, FileSpreadsheet, Download } from 'lucide-react';
 import { ExcelImportModal } from '../components/ExcelImportModal';
@@ -75,6 +75,29 @@ export const SchedulingModule: React.FC = () => {
   } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({});
+
+  // Auto-renew completed sessions after 2.5 minutes (150 seconds) so they are automatically ready for the next week
+  useEffect(() => {
+    const AUTO_RENEW_MS = 150 * 1000; // 2.5 minutes (between 2 and 3 minutes)
+
+    const checkAutoRenew = () => {
+      const now = Date.now();
+      updateDatabaseState((draft) => {
+        draft.sessions.forEach((s) => {
+          if (s.status === 'completed' && s.completedAt) {
+            const elapsed = now - new Date(s.completedAt).getTime();
+            if (elapsed >= AUTO_RENEW_MS) {
+              s.status = 'scheduled';
+            }
+          }
+        });
+      });
+    };
+
+    checkAutoRenew();
+    const timer = setInterval(checkAutoRenew, 3000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Form state - Day of week based
   const [selectedDayId, setSelectedDayId] = useState('saturday');
@@ -227,7 +250,7 @@ export const SchedulingModule: React.FC = () => {
         setActionFeedback({
           type: 'success',
           message: `تم إكمال الحصة بنجاح!`,
-          details: res.message || `تم ترحيل الحصة لشيت الحضور والغياب، واحتساب الحصة للمعلم (${session.teacherNameAr})، وخصم حصة من رصيد الطالب (${session.studentNameAr}).`,
+          details: `${res.message || `تم ترحيل الحصة لشيت الحضور والغياب، واحتساب الحصة للمعلم (${session.teacherNameAr})، وخصم حصة من رصيد الطالب (${session.studentNameAr}).`} • ستتجدد الحصة تلقائياً باللون الأخضر للأسبوع القادم بعد دقيقتين ونصف دون الحاجة للضغط على أي زر.`,
         });
         setTimeout(() => {
           setActionFeedback(null);
@@ -748,8 +771,42 @@ const SessionCard: React.FC<{
   onResetSchedule?: () => void;
   isCompleting?: boolean;
 }> = ({ session, onDelete, onComplete, onResetSchedule, isCompleting }) => {
-  const { db } = useApp();
+  const { db, updateDatabaseState } = useApp();
   const dayInfo = getSessionDay(session);
+
+  // Auto-renew timer: 2.5 minutes (150 seconds)
+  const AUTO_RENEW_MS = 150 * 1000;
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(() => {
+    if (session.status !== 'completed' || !session.completedAt) return 0;
+    const elapsed = Date.now() - new Date(session.completedAt).getTime();
+    return Math.max(0, Math.ceil((AUTO_RENEW_MS - elapsed) / 1000));
+  });
+
+  useEffect(() => {
+    if (session.status !== 'completed' || !session.completedAt) {
+      setSecondsRemaining(0);
+      return;
+    }
+
+    const checkTimer = () => {
+      const elapsed = Date.now() - new Date(session.completedAt).getTime();
+      const left = Math.max(0, Math.ceil((AUTO_RENEW_MS - elapsed) / 1000));
+      setSecondsRemaining(left);
+
+      if (left <= 0) {
+        updateDatabaseState((draft) => {
+          const target = draft.sessions.find((s) => s.id === session.id);
+          if (target && target.status === 'completed') {
+            target.status = 'scheduled';
+          }
+        });
+      }
+    };
+
+    checkTimer();
+    const interval = setInterval(checkTimer, 1000);
+    return () => clearInterval(interval);
+  }, [session.status, session.completedAt, session.id]);
 
   // Find linked student
   const student = db.students.find(
@@ -869,20 +926,31 @@ const SessionCard: React.FC<{
             )}
           </button>
         ) : (
-          <div className="flex items-center gap-1">
-            <span className="py-1 px-1.5 rounded-lg bg-emerald-100 text-emerald-800 text-[9px] sm:text-[10px] font-extrabold flex items-center gap-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 w-full">
+            <span className="py-1 px-2 rounded-lg bg-emerald-100 text-emerald-800 text-[9px] sm:text-[10px] font-extrabold flex items-center justify-center gap-1 shrink-0">
               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
               <span>محسوبة بالحضور</span>
             </span>
-            {onResetSchedule && (
-              <button
-                onClick={onResetSchedule}
-                className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-[9px] sm:text-[10px] font-bold transition-colors border border-slate-200"
-                title="تجديد موعد الحصة للأسبوع القادم"
-              >
-                تجديد للأسبوع القادم
-              </button>
-            )}
+
+            <div className="flex-1 flex items-center justify-between sm:justify-end gap-1.5 bg-blue-50/80 border border-blue-200/90 px-2 py-1 rounded-xl text-[9px] sm:text-[10px] text-blue-900 font-bold">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse shrink-0" />
+                <span>تتجدد تلقائياً للأسبوع القادم:</span>
+                <span className="font-mono font-black text-blue-900 bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                  {Math.floor(secondsRemaining / 60)}:{String(secondsRemaining % 60).padStart(2, '0')}
+                </span>
+              </div>
+
+              {onResetSchedule && (
+                <button
+                  onClick={onResetSchedule}
+                  className="px-1.5 py-0.5 rounded bg-white hover:bg-blue-100 text-blue-700 text-[9px] font-bold transition-colors border border-blue-200 shrink-0"
+                  title="تجديد موعد الحصة فوراً دون انتظار"
+                >
+                  تجديد الآن
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
